@@ -32,23 +32,34 @@ function notify() {
   listeners.forEach(function (fn) { fn(latestItems); });
 }
 
-onSnapshot(
-  itemsCol,
-  function (snap) {
-    latestItems = snap.docs.map(function (d) { return d.data(); });
-    notify();
-  },
-  function (err) {
-    console.error("Firestore sync error", err);
-    window.dispatchEvent(new CustomEvent("shelfsync:error", { detail: err }));
-  }
-);
-
 var authReady = new Promise(function (resolve) {
   onAuthStateChanged(auth, function (user) {
     if (user) resolve(user);
   });
 });
+
+// The Firestore rules require request.auth != null, so the listener must
+// not attach until sign-in has actually completed — starting it earlier
+// gets a permission error that never recovers, even after auth resolves.
+authReady
+  .then(function () {
+    onSnapshot(
+      itemsCol,
+      function (snap) {
+        latestItems = snap.docs.map(function (d) { return d.data(); });
+        notify();
+      },
+      function (err) {
+        console.error("Firestore sync error", err);
+        window.dispatchEvent(new CustomEvent("shelfsync:error", { detail: err }));
+      }
+    );
+  })
+  .catch(function (err) {
+    console.error("Firebase anonymous sign-in failed", err);
+    window.dispatchEvent(new CustomEvent("shelfsync:error", { detail: err }));
+  });
+
 signInAnonymously(auth).catch(function (err) {
   console.error("Firebase anonymous sign-in failed", err);
   window.dispatchEvent(new CustomEvent("shelfsync:error", { detail: err }));

@@ -62,8 +62,8 @@
     setSyncStatus("connecting...");
     sync.authReady
       .then(function () {
-        setSyncStatus("synced");
         sync.subscribe(function (remoteItems) {
+          setSyncStatus("synced");
           state.items = remoteItems;
           saveItems(); // keep the local cache warm for instant load next time
           renderGrid();
