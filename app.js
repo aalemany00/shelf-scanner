@@ -409,14 +409,33 @@
     var file = el.scanInput.files && el.scanInput.files[0];
     if (!file) return;
 
-    var url = URL.createObjectURL(file);
-    el.scanPreview.src = url;
+    var rawUrl = URL.createObjectURL(file);
+    el.scanPreview.src = rawUrl;
     el.scanPreviewWrap.classList.remove("hidden");
     setStatus("Reading barcode...");
 
-    var reader = new ZXing.BrowserMultiFormatReader();
-    reader
-      .decodeFromImageUrl(url)
+    // Phone photos can be 3000-4000px wide, which tends to hurt ZXing's
+    // decode reliability more than help it. Downscale first, and use
+    // TRY_HARDER since a single still photo gets one shot (no retry across
+    // frames the way live video scanning would get).
+    resizeImage(rawUrl, 1400)
+      .then(function (resizedUrl) {
+        var hints = new Map();
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.UPC_E,
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.QR_CODE
+        ]);
+        var reader = new ZXing.BrowserMultiFormatReader(hints);
+        return reader.decodeFromImageUrl(resizedUrl).finally(function () {
+          URL.revokeObjectURL(resizedUrl);
+        });
+      })
       .then(function (result) {
         onScanSuccess(result.getText());
       })
@@ -425,8 +444,33 @@
       })
       .finally(function () {
         el.scanPreviewWrap.classList.add("hidden");
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(rawUrl);
       });
+  }
+
+  // Draws `url` onto a canvas scaled so its longest side is `maxSize`,
+  // returning an object URL for the resized JPEG.
+  function resizeImage(url, maxSize) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          function (blob) {
+            if (blob) resolve(URL.createObjectURL(blob));
+            else reject(new Error("resize failed"));
+          },
+          "image/jpeg",
+          0.92
+        );
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
   }
 
   function onScanSuccess(decodedText) {
