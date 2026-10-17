@@ -120,3 +120,20 @@ on any of these free services degrades to a clean "unreachable, try later or
 enter manually" message instead of an opaque error with broken CORS. Manga
 lookup itself is unverified live (Jikan was down for the whole session) —
 retest once their service is back up.
+
+**Where the plan broke (again):** Adrian tested comic search for "The
+Amazing Spider-Man #363" and got ~10 unrelated Spider-Man issues, none
+actually #363. ComicVine's plain-text issue search matches words in issue
+titles/blurbs, not the issue_number field — searching "363" as text doesn't
+mean "find issue 363."
+
+**Decided:** when the typed title ends in a number, search for the series
+(volume) by name first, then query that volume's issues filtered by the
+exact issue_number — confirmed this returns the precise issue (tested
+"Amazing Spider-Man 363" → the real 1992 issue, cover and all). Multiple
+volumes often share a series name across reboots; picks the volume with the
+most issues as the likely "main" series, checking the top 3 in case the
+single exact issue isn't in the biggest one. This is a heuristic, not a
+guarantee — an obscure reboot's issue 363 could still be missed. Falls back
+to the old plain-text search if no number is found or no exact match comes
+back.
