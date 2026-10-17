@@ -155,7 +155,12 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
   font-size: 0.95rem;
 }
 
-.form-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.form-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+
+/* The confirm panel's row has three buttons (Add/Edit/Cancel) next to a
+   fixed-width cover image, which is too tight for three equal flex:1
+   buttons on a phone — let only the primary one claim extra space. */
+.confirm-panel .form-actions .btn:not(.primary) { flex: 0 1 auto; }
 
 .link-btn {
   display: block;
