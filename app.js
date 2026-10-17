@@ -16,7 +16,7 @@
   // Barcode lookup is unreliable for these; manual entry is the default path.
   var SCAN_UNRELIABLE = { comic: true, manga: true };
   // Categories with a title-search API wired up in the Worker (worker/src/index.js).
-  var SEARCH_KIND = { movie: "movie", game: "game" };
+  var SEARCH_KIND = { movie: "movie", game: "game", comic: "comic", manga: "manga" };
 
   var state = {
     category: "game",

@@ -99,3 +99,24 @@ project this is an acceptable tradeoff, written down here so it's a chosen
 boundary, not an accident. Firestore rules (deployed via `firebase deploy
 --only firestore:rules`, see `firestore.rules`) require sign-in and a sane
 document shape, replacing the default wide-open 30-day test mode.
+
+## 2026-10-17 (comic/manga lookup)
+
+**Built:** ComicVine title search for comics, Jikan (MyAnimeList) title
+search for manga, both proxied through the Worker (neither sends CORS
+headers, so a direct browser call would've failed the same way UPCitemdb
+did). ComicVine needs its own free API key (account required, non-commercial
+use only); Jikan needs none.
+
+**Where the plan broke:** Jikan hit a sustained outage while testing (every
+request timed out, both from my sandbox and from the Worker itself — a
+genuine problem on their end, not something fixable here). It was also
+surfacing as a raw, CORS-less Cloudflare error page in the app instead of a
+usable message.
+
+**Decided:** wrapped every upstream API call (UPC, OMDb, RAWG, ComicVine,
+Jikan) in a shared timeout + try/catch in the Worker, so any future outage
+on any of these free services degrades to a clean "unreachable, try later or
+enter manually" message instead of an opaque error with broken CORS. Manga
+lookup itself is unverified live (Jikan was down for the whole session) —
+retest once their service is back up.
