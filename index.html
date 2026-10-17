@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Shelf Scanner</title>
+  <meta name="theme-color" content="#14161c">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Shelf Scanner</h1>
+    <span id="syncStatus" class="pill">local only</span>
+  </header>
+
+  <nav class="categories" id="categoryTabs">
+    <button class="cat-tab active" data-cat="game">Games</button>
+    <button class="cat-tab" data-cat="figure">Figures</button>
+    <button class="cat-tab" data-cat="comic">Comics</button>
+    <button class="cat-tab" data-cat="movie">Movies</button>
+    <button class="cat-tab" data-cat="manga">Manga</button>
+  </nav>
+
+  <main>
+    <section class="add-panel">
+      <div class="add-actions">
+        <button id="scanBtn" class="btn primary">Scan Barcode</button>
+        <button id="typeBtn" class="btn">Enter Manually</button>
+      </div>
+
+      <div id="scannerWrap" class="scanner-wrap hidden">
+        <div id="reader"></div>
+        <button id="cancelScanBtn" class="btn">Cancel</button>
+      </div>
+
+      <form id="searchForm" class="manual-form hidden">
+        <input type="text" id="searchTitleInput" placeholder="Title" autocomplete="off">
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Search</button>
+          <button type="button" id="cancelSearchBtn" class="btn">Cancel</button>
+        </div>
+      </form>
+
+      <div id="searchResults" class="search-results hidden"></div>
+
+      <form id="manualForm" class="manual-form hidden">
+        <input type="text" id="titleInput" placeholder="Title" autocomplete="off">
+        <input type="text" id="imageInput" placeholder="Cover image URL (optional)" autocomplete="off">
+        <input type="text" id="notesInput" placeholder="Notes (optional)" autocomplete="off">
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Add to Collection</button>
+          <button type="button" id="cancelManualBtn" class="btn">Cancel</button>
+        </div>
+      </form>
+
+      <div id="confirmPanel" class="confirm-panel hidden">
+        <img id="confirmImage" alt="">
+        <div class="confirm-info">
+          <h3 id="confirmTitle"></h3>
+          <p id="confirmMeta"></p>
+          <div class="form-actions">
+            <button id="confirmAddBtn" class="btn primary">Add to Collection</button>
+            <button id="confirmEditBtn" class="btn">Edit</button>
+            <button id="confirmCancelBtn" class="btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="statusMsg" class="status-msg"></p>
+    </section>
+
+    <section class="collection">
+      <h2 id="collectionTitle">Games</h2>
+      <div id="grid" class="grid"></div>
+      <p id="emptyMsg" class="empty-msg hidden">Nothing here yet — scan or add your first item.</p>
+    </section>
+  </main>
+
+  <div id="itemOverlay" class="overlay hidden">
+    <div class="overlay-card">
+      <img id="itemImage" alt="">
+      <h3 id="itemTitle"></h3>
+      <p id="itemMeta"></p>
+      <p id="itemNotes"></p>
+      <div class="form-actions">
+        <button id="deleteItemBtn" class="btn danger">Remove</button>
+        <button id="closeItemBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
