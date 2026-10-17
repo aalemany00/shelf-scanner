@@ -10,7 +10,11 @@ laptop.
 - Plain HTML/CSS/JS, no build step, deployed as a static site to GitHub Pages.
 - Installable as a PWA (manifest + service worker) for full-screen/camera use
   on a phone home screen.
-- Barcode scanning: `html5-qrcode` (loaded via CDN) using the phone camera.
+- Barcode scanning: takes a single photo via the native camera
+  (`<input type="file" capture="environment">`) and decodes it client-side
+  with `@zxing/library`. Not a live video decode loop — html5-qrcode's live
+  loop hit an unresolved WebKit bug on iOS Safari (camera preview renders,
+  decode callback never fires).
 - Lookup: UPCitemdb trial endpoint (keyless) for games/figures/movies.
   Comics/manga fall back to manual title entry (barcode lookup for these is
   unreliable) — a ComicVine-backed search is a planned upgrade, not yet wired

@@ -97,7 +97,13 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
 .btn.danger { background: var(--danger); color: #2a0606; border-color: var(--danger); }
 
 .scanner-wrap { margin-top: 1rem; }
-#reader { border-radius: var(--radius); overflow: hidden; }
+#scanPreview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: #0c0d11;
+}
 
 .manual-form, .confirm-panel, .search-results { margin-top: 1rem; }
 

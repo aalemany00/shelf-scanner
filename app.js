@@ -21,8 +21,7 @@
   var state = {
     category: "game",
     items: loadItems(),
-    pendingMatch: null, // the item waiting in the confirm panel
-    scanner: null
+    pendingMatch: null // the item waiting in the confirm panel
   };
 
   var el = {};
@@ -82,8 +81,9 @@
     el.tabs = document.getElementById("categoryTabs");
     el.scanBtn = document.getElementById("scanBtn");
     el.typeBtn = document.getElementById("typeBtn");
-    el.scannerWrap = document.getElementById("scannerWrap");
-    el.cancelScanBtn = document.getElementById("cancelScanBtn");
+    el.scanInput = document.getElementById("scanInput");
+    el.scanPreviewWrap = document.getElementById("scanPreviewWrap");
+    el.scanPreview = document.getElementById("scanPreview");
     el.searchForm = document.getElementById("searchForm");
     el.searchTitleInput = document.getElementById("searchTitleInput");
     el.cancelSearchBtn = document.getElementById("cancelSearchBtn");
@@ -123,7 +123,7 @@
     });
 
     el.scanBtn.addEventListener("click", startScan);
-    el.cancelScanBtn.addEventListener("click", stopScan);
+    el.scanInput.addEventListener("change", onPhotoSelected);
 
     el.typeBtn.addEventListener("click", function () {
       if (SEARCH_KIND[state.category]) {
@@ -201,7 +201,6 @@
     hideManualForm();
     hideSearchForm();
     hideConfirmPanel();
-    stopScan();
   }
 
   // ---------- storage ----------
@@ -378,6 +377,13 @@
   }
 
   // ---------- scanning ----------
+  //
+  // Takes a single photo via the phone's native camera (capture="environment")
+  // and decodes it client-side with ZXing, rather than running a live video
+  // decode loop in-page. html5-qrcode's live loop hits an unresolved WebKit
+  // bug on iOS Safari (camera preview renders, decode callback never fires —
+  // see github.com/mebjas/html5-qrcode issues #915, #1036, #820, #484).
+  // Decoding one still photo sidesteps that whole class of bug.
 
   function startScan() {
     hideManualForm();
@@ -390,55 +396,40 @@
       return;
     }
 
-    if (typeof Html5Qrcode === "undefined") {
+    if (typeof ZXing === "undefined") {
       setStatus("Scanner library failed to load. Check your connection and reload.");
       return;
     }
 
-    el.scannerWrap.classList.remove("hidden");
-    setStatus("Point the camera at the barcode.");
-
-    // formatsToSupport narrows the decoder to barcode types that actually
-    // appear on retail items, which the library's docs say improves
-    // detection speed/accuracy over scanning for every format at once.
-    var scannerConfig = { verbose: false };
-    if (typeof Html5QrcodeSupportedFormats !== "undefined") {
-      scannerConfig.formatsToSupport = [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.QR_CODE
-      ];
-    }
-    state.scanner = new Html5Qrcode("reader", scannerConfig);
-    state.scanner
-      .start(
-        { facingMode: "environment" },
-        { fps: 15, qrbox: { width: 300, height: 150 }, disableFlip: true },
-        onScanSuccess,
-        function () {} // ignore per-frame "not found" noise
-      )
-      .catch(function (err) {
-        setStatus("Could not start camera: " + err);
-        el.scannerWrap.classList.add("hidden");
-      });
+    el.scanInput.value = ""; // let re-selecting the same photo re-fire change
+    el.scanInput.click();
   }
 
-  function stopScan() {
-    el.scannerWrap.classList.add("hidden");
-    if (state.scanner) {
-      state.scanner.stop().catch(function () {}).then(function () {
-        state.scanner.clear();
-        state.scanner = null;
+  function onPhotoSelected() {
+    var file = el.scanInput.files && el.scanInput.files[0];
+    if (!file) return;
+
+    var url = URL.createObjectURL(file);
+    el.scanPreview.src = url;
+    el.scanPreviewWrap.classList.remove("hidden");
+    setStatus("Reading barcode...");
+
+    var reader = new ZXing.BrowserMultiFormatReader();
+    reader
+      .decodeFromImageUrl(url)
+      .then(function (result) {
+        onScanSuccess(result.getText());
+      })
+      .catch(function () {
+        setStatus("Couldn't read a barcode in that photo — try again, or enter the title instead.");
+      })
+      .finally(function () {
+        el.scanPreviewWrap.classList.add("hidden");
+        URL.revokeObjectURL(url);
       });
-    }
   }
 
   function onScanSuccess(decodedText) {
-    stopScan();
     setStatus("Found code " + decodedText + " — looking it up...");
     lookupUpc(decodedText);
   }

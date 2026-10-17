@@ -34,9 +34,13 @@
         <button id="typeBtn" class="btn">Enter Manually</button>
       </div>
 
-      <div id="scannerWrap" class="scanner-wrap hidden">
-        <div id="reader"></div>
-        <button id="cancelScanBtn" class="btn">Cancel</button>
+      <!-- capture="environment" opens the phone's native camera to take a
+           single photo, which we decode client-side. Live in-page video
+           scanning hits an unresolved WebKit bug on iOS Safari where the
+           decode loop never fires even though the preview renders. -->
+      <input type="file" id="scanInput" accept="image/*" capture="environment" class="hidden">
+      <div id="scanPreviewWrap" class="scanner-wrap hidden">
+        <img id="scanPreview" alt="Captured barcode photo">
       </div>
 
       <form id="searchForm" class="manual-form hidden">
@@ -95,7 +99,7 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script type="module" src="sync.js"></script>
   <script src="app.js"></script>
 </body>

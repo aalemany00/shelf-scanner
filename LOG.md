@@ -53,6 +53,26 @@ wired up.
 **Open:** ComicVine/Jikan for comics/manga; deploy to GitHub Pages; Layer 2
 visual polish.
 
+## 2026-10-17 (scanner rework)
+
+**Where the plan broke:** deployed to GitHub Pages and tested on Adrian's
+actual iPhone — the camera opened and showed a live preview, but it never
+detected any barcode held up to it. Turned out to be an unresolved,
+long-standing WebKit bug in html5-qrcode's live-video decode loop on iOS
+Safari (multiple open GitHub issues on the library going back to 2022,
+still unresolved as of 2026). Config tuning (format list, scan box size)
+made no difference, as expected for a bug at that level.
+
+**Decided:** replace live in-page video scanning with "take a photo, then
+decode the photo" — `<input type="file" capture="environment">` opens the
+phone's native camera for a single still shot, decoded client-side with
+`@zxing/library`. This sidesteps the WebKit live-decode bug entirely since
+it's a one-shot image decode, not a running video pipeline. Verified the
+decode path itself works (generated a barcode locally and decoded it
+through the same code path the app uses) without a real camera available
+to the agent; real-world camera-photo quality (focus, lighting, angle) is
+Adrian's to verify on his phone.
+
 ## 2026-10-17 (later)
 
 **Built:** got OMDb and RAWG keys, set as Worker secrets — movie/game title
