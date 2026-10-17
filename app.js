@@ -440,7 +440,7 @@
         onScanSuccess(result.getText());
       })
       .catch(function () {
-        setStatus("Couldn't read a barcode in that photo — try again, or enter the title instead.");
+        setStatus("Couldn't read a barcode in that photo — try zooming in closer, or enter the title instead.");
       })
       .finally(function () {
         el.scanPreviewWrap.classList.add("hidden");

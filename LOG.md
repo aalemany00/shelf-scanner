@@ -73,6 +73,14 @@ through the same code path the app uses) without a real camera available
 to the agent; real-world camera-photo quality (focus, lighting, angle) is
 Adrian's to verify on his phone.
 
+**Resolved:** real iPhone testing showed the photo-decode failing even
+with good lighting/focus/distance, until Adrian zoomed the camera in all
+the way — then it worked. The barcode needs to fill most of the frame so
+the bar widths are large enough to resolve; "pointed at it from a normal
+distance" wasn't enough. Added a visible hint under the scan button and
+updated the failure message to say so, instead of leaving this as
+tribal knowledge.
+
 ## 2026-10-17 (later)
 
 **Built:** got OMDb and RAWG keys, set as Worker secrets — movie/game title
