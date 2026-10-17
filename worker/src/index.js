@@ -10,11 +10,13 @@
 //   GET /?upc=XXXXXXXXXXXXX           -> UPCitemdb trial lookup (best-effort)
 //   GET /search?kind=movie&title=...  -> OMDb (by title)
 //   GET /search?kind=game&title=...   -> RAWG (by title)
-//   GET /search?kind=comic&title=...          -> ComicVine (by title; a
-//     trailing issue number finds that exact issue, otherwise returns a
-//     list of distinct series/eras to pick from first — see comic-issues)
+//   GET /search?kind=comic&title=...          -> ComicVine + Jikan combined
+//     (manga isn't a separate category client-side — it's just another
+//     series within the same comic model). A trailing issue number finds
+//     that exact ComicVine issue; otherwise returns distinct series/eras
+//     from ComicVine plus manga titles from Jikan to pick from — see
+//     comic-issues for drilling into a ComicVine series' issue list.
 //   GET /search?kind=comic-issues&volumeId=... -> that series' issue list
-//   GET /search?kind=manga&title=...  -> Jikan/MyAnimeList (by title, no key needed)
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -58,8 +60,7 @@ async function handleUpcLookup(url) {
 var SEARCH_SOURCE_NAME = {
   movie: "OMDb",
   game: "RAWG",
-  comic: "ComicVine",
-  manga: "Jikan"
+  comic: "ComicVine/Jikan"
 };
 
 async function handleSearch(url, env) {
@@ -82,7 +83,7 @@ async function handleSearch(url, env) {
       return json({ error: "Missing title parameter." }, 400);
     }
 
-    var handler = { movie: searchOmdb, game: searchRawg, comic: searchComicVine, manga: searchJikan }[kind];
+    var handler = { movie: searchOmdb, game: searchRawg, comic: searchComicVine }[kind];
     if (!handler) {
       return json({ error: "Unsupported kind: " + kind }, 400);
     }
@@ -148,6 +149,7 @@ function cvItem(c) {
   var issueNum = c.issue_number ? " #" + c.issue_number : "";
   return {
     title: volumeName + issueNum,
+    seriesName: volumeName,
     image: (c.image && (c.image.small_url || c.image.thumb_url)) || "",
     meta: "Comic" + (c.cover_date ? " · " + c.cover_date : "")
   };
@@ -168,37 +170,44 @@ async function searchComicVineVolumes(seriesTitle, env) {
 }
 
 async function searchComicVine(title, env) {
-  if (!env.COMICVINE_API_KEY) {
-    return json({ error: "ComicVine key not configured yet." }, 501);
-  }
-
   // "The Amazing Spider-Man #363" as plain text search matches on issue
   // titles/descriptions, not issue number, so it mostly returns whatever
   // issues happen to mention "363" in their blurb — not issue #363. If the
   // input ends in a number, find the series (volume) first, then ask for
   // that exact issue number within it, which actually works.
   var issueMatch = title.match(/^(.*?)[\s#]+(\d+)\s*$/);
-  if (issueMatch) {
-    var items = await searchComicVineByIssueNumber(issueMatch[1].trim(), issueMatch[2], env);
-    if (items.length) return json({ items: items }, 200);
-    // Fall through to the series picker if nothing matched that exact issue.
+  if (issueMatch && env.COMICVINE_API_KEY) {
+    var exact = await searchComicVineByIssueNumber(issueMatch[1].trim(), issueMatch[2], env);
+    if (exact.length) return json({ items: exact }, 200);
+    // Fall through to the series/manga picker if nothing matched that exact issue.
   }
 
-  // No issue number given: a plain issue-text search mostly returns
-  // whichever single volume has the most/newest issues, repeated — not
-  // useful for "what Green Lantern comics exist." Show distinct series
-  // (eras/reboots) instead; picking one drills into its issue list
-  // (kind=comic-issues) rather than adding something directly.
-  var volumes = await searchComicVineVolumes(issueMatch ? issueMatch[1].trim() : title, env);
-  var items = volumes.slice(0, 8).map(function (v) {
-    return {
-      title: v.name + (v.start_year ? " (" + v.start_year + ")" : ""),
-      image: (v.image && (v.image.small_url || v.image.thumb_url)) || "",
-      meta: "Comic series" + (v.count_of_issues ? " · " + v.count_of_issues + " issues" : ""),
-      volumeId: v.id
-    };
-  });
-  return json({ items: items }, 200);
+  // No issue number (or no exact match): a plain issue-text search mostly
+  // returns whichever single volume has the most/newest issues, repeated —
+  // not useful for "what Green Lantern comics exist." Show distinct series
+  // (eras/reboots) instead, plus manga titles from Jikan (manga isn't a
+  // separate category — just another series in the same model). Picking a
+  // ComicVine series drills into its issue list (kind=comic-issues); picking
+  // a manga title adds it directly, since Jikan doesn't expose per-volume
+  // records the way ComicVine does.
+  var seriesTitle = issueMatch ? issueMatch[1].trim() : title;
+  var comicItems = [];
+  if (env.COMICVINE_API_KEY) {
+    var volumes = await searchComicVineVolumes(seriesTitle, env);
+    comicItems = volumes.slice(0, 6).map(function (v) {
+      return {
+        title: v.name + (v.start_year ? " (" + v.start_year + ")" : ""),
+        seriesName: v.name,
+        image: (v.image && (v.image.small_url || v.image.thumb_url)) || "",
+        meta: "Comic series" + (v.count_of_issues ? " · " + v.count_of_issues + " issues" : ""),
+        volumeId: v.id
+      };
+    });
+  }
+
+  var mangaItems = await searchJikanItems(seriesTitle).catch(function () { return []; });
+
+  return json({ items: comicItems.concat(mangaItems) }, 200);
 }
 
 async function searchComicVineByIssueNumber(seriesTitle, issueNumber, env) {
@@ -245,20 +254,20 @@ async function listComicVineIssues(volumeId, env) {
   return json({ items: (data.results || []).map(cvItem) }, 200);
 }
 
-async function searchJikan(title) {
+async function searchJikanItems(title) {
   const upstream = await fetchWithTimeout(
-    "https://api.jikan.moe/v4/manga?q=" + encodeURIComponent(title) + "&limit=8"
+    "https://api.jikan.moe/v4/manga?q=" + encodeURIComponent(title) + "&limit=6"
   );
   const data = await upstream.json();
 
-  const items = (data.data || []).map(function (m) {
+  return (data.data || []).map(function (m) {
     return {
       title: m.title + (m.published && m.published.string ? " (" + m.published.string + ")" : ""),
+      seriesName: m.title,
       image: (m.images && m.images.jpg && m.images.jpg.image_url) || "",
       meta: "Manga"
     };
   });
-  return json({ items: items }, 200);
 }
 
 function json(data, status) {

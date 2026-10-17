@@ -20,7 +20,6 @@
     <button class="cat-tab" data-cat="figure">Figures</button>
     <button class="cat-tab" data-cat="comic">Comics</button>
     <button class="cat-tab" data-cat="movie">Movies</button>
-    <button class="cat-tab" data-cat="manga">Manga</button>
   </nav>
 
   <p id="attribution" class="attribution hidden">
@@ -70,6 +69,11 @@
         <div class="confirm-info">
           <h3 id="confirmTitle"></h3>
           <p id="confirmMeta"></p>
+          <div id="confirmStatusRow" class="status-row hidden">
+            <button type="button" class="status-chip" data-status="have">Have It</button>
+            <button type="button" class="status-chip" data-status="want">Want It</button>
+            <button type="button" class="status-chip" data-status="read">Read It</button>
+          </div>
           <div class="form-actions">
             <button id="confirmAddBtn" class="btn primary">Add to Collection</button>
             <button id="confirmEditBtn" class="btn">Edit</button>
@@ -93,10 +97,27 @@
       <img id="itemImage" alt="">
       <h3 id="itemTitle"></h3>
       <p id="itemMeta"></p>
+      <div id="itemStatusRow" class="status-row hidden">
+        <button type="button" class="status-chip" data-status="have">Have It</button>
+        <button type="button" class="status-chip" data-status="want">Want It</button>
+        <button type="button" class="status-chip" data-status="read">Read It</button>
+      </div>
       <p id="itemNotes"></p>
       <div class="form-actions">
         <button id="deleteItemBtn" class="btn danger">Remove</button>
         <button id="closeItemBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comics/manga only: the collection grid groups owned items by series;
+       this lists the individual owned issues/volumes within one series. -->
+  <div id="seriesOverlay" class="overlay hidden">
+    <div class="overlay-card series-card">
+      <h3 id="seriesOverlayTitle"></h3>
+      <div id="seriesOverlayGrid" class="grid"></div>
+      <div class="form-actions">
+        <button id="closeSeriesBtn" class="btn">Close</button>
       </div>
     </div>
   </div>

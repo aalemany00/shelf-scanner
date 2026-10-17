@@ -252,3 +252,62 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
 .overlay-card h3 { margin: 0 0 0.3rem; }
 .overlay-card p { color: var(--muted); font-size: 0.85rem; margin: 0.2rem 0; }
 .overlay-card .form-actions { justify-content: center; }
+
+.status-row {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  margin: 0.6rem 0;
+  flex-wrap: wrap;
+}
+
+.confirm-info .status-row { justify-content: flex-start; }
+
+.status-chip {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--panel-2);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.status-chip.active[data-status="have"] { background: var(--accent); border-color: var(--accent); color: #06242c; font-weight: 600; }
+.status-chip.active[data-status="want"] { background: #ffb86e; border-color: #ffb86e; color: #3a2200; font-weight: 600; }
+.status-chip.active[data-status="read"] { background: #a0f0a0; border-color: #a0f0a0; color: #0a2a0a; font-weight: 600; }
+
+.series-card { max-width: 480px; text-align: left; }
+.series-card h3 { text-align: center; margin-bottom: 0.75rem; }
+.series-card .grid { max-height: 50vh; overflow-y: auto; }
+
+.series-tile .badge {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  background: rgba(0,0,0,0.75);
+  color: var(--text);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+
+.grid-item { position: relative; }
+
+.status-dot {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  display: flex;
+  gap: 0.2rem;
+}
+
+.status-dot span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  display: block;
+}
+
+.status-dot .have { background: var(--accent); }
+.status-dot .want { background: #ffb86e; }
+.status-dot .read { background: #a0f0a0; }

@@ -159,3 +159,47 @@ search was a dead end.
 - Added a persistent "Can't find it? Enter it manually instead" link on the
   search form itself, so a bad/failed/empty search always has an escape
   hatch to plain manual entry, pre-filled with whatever was typed.
+
+## 2026-10-17 (Layer 2 pulled forward: League of Comic Geeks tour)
+
+**Planned:** Adrian looked at League of Comic Geeks (an established comic
+collection tracker) and asked to adopt several of its ideas before the
+deadline: group the collection grid by series instead of a flat list of
+issues, drop the separate Manga tab (a real comics site doesn't treat manga
+as a different thing — it's just another series), and track Have/Want/Read
+status instead of a single "added" state. Explicitly skipped: market
+pricing, key-issue flags, star ratings, reviews — real scope creep for a
+personal cataloging app.
+
+**Decided (confirmed with Adrian before building, since redoing this later
+would be expensive):**
+- Manga merges into the Comics category entirely — one tab, one data model.
+  `loadItems()` migrates any old `category: "manga"` test data to `"comic"`.
+- Have/Want/Read status only applies to comics (figures/games/movies keep
+  the simple "add it, you have it" model — "Read" doesn't mean anything for
+  a game).
+- The series-grouped grid (one tile per series, count badge, click to see
+  owned issues) is comics-only too, not applied to the other categories.
+- The Scan Barcode button and zoom hint are now hidden entirely for
+  Comics (not just redirected to search) — a barcode was never going to
+  resolve to a specific comic issue anyway.
+
+**Built:**
+- Worker: the unified `comic` search kind now runs ComicVine (series/issues)
+  and Jikan (manga titles) together for a general/series-level search,
+  returning both in one list. ComicVine already carries real coverage for
+  well-known manga (e.g. "Naruto" returned 6 real volumes with covers
+  directly from ComicVine), so this works even while Jikan remains down.
+  `cvItem()` and the Jikan mapping now emit `seriesName` as its own field
+  (not just baked into the display title), so the client can group by it.
+- `app.js`: `status: {have, want, read}` on comic items, toggleable as chips
+  in both the confirm panel (before adding) and the item overlay (after,
+  e.g. marking something Read later). The comics grid groups by
+  `seriesName` into one tile per series with a count badge and small
+  have/want/read dots on individual issues; a new series drill-down overlay
+  lists the owned issues in one series.
+
+**Not done / explicitly out of scope:** market pricing, key-issue flags,
+star ratings, reviews, variant-edition tracking — all real features on
+League of Comic Geeks, left out as scope creep beyond a personal cataloging
+tool.
