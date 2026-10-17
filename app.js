@@ -75,6 +75,7 @@
     el.itemNotes = document.getElementById("itemNotes");
     el.deleteItemBtn = document.getElementById("deleteItemBtn");
     el.closeItemBtn = document.getElementById("closeItemBtn");
+    el.attribution = document.getElementById("attribution");
   }
 
   function bindEvents() {
@@ -147,6 +148,8 @@
     Array.prototype.forEach.call(el.tabs.children, function (btn) {
       btn.classList.toggle("active", btn.dataset.cat === state.category);
     });
+    // RAWG's free tier requires a visible backlink wherever its data is shown.
+    el.attribution.classList.toggle("hidden", state.category !== "game");
   }
 
   function setCategory(cat) {
