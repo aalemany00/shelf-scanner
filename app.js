@@ -40,6 +40,42 @@
     bindEvents();
     renderTabs();
     renderGrid();
+    initSync();
+  }
+
+  // ---------- sync (Firebase, see sync.js) ----------
+
+  function initSync() {
+    if (window.ShelfSync) {
+      attachSync(window.ShelfSync);
+    } else {
+      window.addEventListener("shelfsync:loaded", function () {
+        attachSync(window.ShelfSync);
+      });
+    }
+    window.addEventListener("shelfsync:error", function () {
+      setSyncStatus("sync error — working offline");
+    });
+  }
+
+  function attachSync(sync) {
+    setSyncStatus("connecting...");
+    sync.authReady
+      .then(function () {
+        setSyncStatus("synced");
+        sync.subscribe(function (remoteItems) {
+          state.items = remoteItems;
+          saveItems(); // keep the local cache warm for instant load next time
+          renderGrid();
+        });
+      })
+      .catch(function () {
+        setSyncStatus("sync error — working offline");
+      });
+  }
+
+  function setSyncStatus(text) {
+    if (el.syncStatus) el.syncStatus.textContent = text;
   }
 
   function cacheEls() {
@@ -76,6 +112,7 @@
     el.deleteItemBtn = document.getElementById("deleteItemBtn");
     el.closeItemBtn = document.getElementById("closeItemBtn");
     el.attribution = document.getElementById("attribution");
+    el.syncStatus = document.getElementById("syncStatus");
   }
 
   function bindEvents() {
@@ -139,6 +176,10 @@
       saveItems();
       hideItemOverlay();
       renderGrid();
+
+      if (window.ShelfSync) {
+        window.ShelfSync.deleteItem(id).catch(function () {});
+      }
     });
   }
 
@@ -183,7 +224,7 @@
   }
 
   function addItem(data) {
-    state.items.push({
+    var item = {
       id: String(Date.now()) + Math.random().toString(16).slice(2),
       category: data.category || state.category,
       title: data.title || "Untitled",
@@ -192,10 +233,17 @@
       notes: data.notes || "",
       source: data.source || "manual",
       addedAt: new Date().toISOString()
-    });
+    };
+    state.items.push(item);
     saveItems();
     renderGrid();
     setStatus("Added to your collection.");
+
+    if (window.ShelfSync) {
+      window.ShelfSync.setItem(item).catch(function () {
+        setStatus("Added locally, but sync failed — will stay on this device for now.");
+      });
+    }
   }
 
   // ---------- grid ----------

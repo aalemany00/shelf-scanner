@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// Single-user app (just Adrian, across his own devices): anonymous auth just
+// proves "this is a client of the app," not a specific identity, so there's
+// one shared "items" collection rather than per-user scoping. The rules
+// below require sign-in and a sane document shape, which is the realistic
+// bar for a personal hobby project — not aiming for multi-tenant security.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /items/{itemId} {
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+        && request.resource.data.id == itemId
+        && request.resource.data.category in ["game", "figure", "comic", "movie", "manga"]
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() < 300;
+
+      allow delete: if request.auth != null;
+    }
+  }
+}

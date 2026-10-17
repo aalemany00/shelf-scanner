@@ -50,6 +50,24 @@ never reach the browser or the repo. Figures have no good free database and
 stay manual-entry only. Comics/manga still need ComicVine/Jikan, not yet
 wired up.
 
-**Open:** get free OMDb and RAWG API keys and set them as Worker secrets;
-ComicVine/Jikan for comics/manga; Firebase sync; deploy to GitHub Pages;
-Layer 2 visual polish.
+**Open:** ComicVine/Jikan for comics/manga; deploy to GitHub Pages; Layer 2
+visual polish.
+
+## 2026-10-17 (later)
+
+**Built:** got OMDb and RAWG keys, set as Worker secrets — movie/game title
+search is fully live. Set up Firebase (Firestore + Anonymous auth) for
+phone-laptop sync, with a `sync.js` module that mirrors `state.items`
+to/from a shared `items` collection. Verified real cross-device sync by
+adding an item in one browser session and watching it appear in a second,
+independent one without a page reload.
+
+**Decided:** one shared Firestore collection, not scoped per Firebase Auth
+user ID. This is deliberately not multi-tenant-secure — anonymous auth here
+just proves "a client of this app," not "a specific person," and two
+devices signed in anonymously get two different auth UIDs anyway, which
+would break sync if the data were scoped per-UID. For a single-user hobby
+project this is an acceptable tradeoff, written down here so it's a chosen
+boundary, not an accident. Firestore rules (deployed via `firebase deploy
+--only firestore:rules`, see `firestore.rules`) require sign-in and a sane
+document shape, replacing the default wide-open 30-day test mode.
