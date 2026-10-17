@@ -10,7 +10,10 @@
 //   GET /?upc=XXXXXXXXXXXXX           -> UPCitemdb trial lookup (best-effort)
 //   GET /search?kind=movie&title=...  -> OMDb (by title)
 //   GET /search?kind=game&title=...   -> RAWG (by title)
-//   GET /search?kind=comic&title=...  -> ComicVine (by title)
+//   GET /search?kind=comic&title=...          -> ComicVine (by title; a
+//     trailing issue number finds that exact issue, otherwise returns a
+//     list of distinct series/eras to pick from first — see comic-issues)
+//   GET /search?kind=comic-issues&volumeId=... -> that series' issue list
 //   GET /search?kind=manga&title=...  -> Jikan/MyAnimeList (by title, no key needed)
 
 const CORS_HEADERS = {
@@ -61,16 +64,6 @@ var SEARCH_SOURCE_NAME = {
 
 async function handleSearch(url, env) {
   const kind = url.searchParams.get("kind") || "";
-  const title = (url.searchParams.get("title") || "").trim();
-
-  if (!title) {
-    return json({ error: "Missing title parameter." }, 400);
-  }
-
-  var handler = { movie: searchOmdb, game: searchRawg, comic: searchComicVine, manga: searchJikan }[kind];
-  if (!handler) {
-    return json({ error: "Unsupported kind: " + kind }, 400);
-  }
 
   // A single try/catch around every upstream call: any of these free-tier
   // APIs can be slow, rate-limited, or just down (Jikan hit a sustained
@@ -78,6 +71,21 @@ async function handleSearch(url, env) {
   // otherwise surface as an opaque Cloudflare error page with no CORS
   // headers, which the app can't show a useful message for.
   try {
+    if (kind === "comic-issues") {
+      const volumeId = url.searchParams.get("volumeId") || "";
+      if (!volumeId) return json({ error: "Missing volumeId parameter." }, 400);
+      return await listComicVineIssues(volumeId, env);
+    }
+
+    const title = (url.searchParams.get("title") || "").trim();
+    if (!title) {
+      return json({ error: "Missing title parameter." }, 400);
+    }
+
+    var handler = { movie: searchOmdb, game: searchRawg, comic: searchComicVine, manga: searchJikan }[kind];
+    if (!handler) {
+      return json({ error: "Unsupported kind: " + kind }, 400);
+    }
     return await handler(title, env);
   } catch (err) {
     var name = SEARCH_SOURCE_NAME[kind] || kind;
@@ -145,6 +153,20 @@ function cvItem(c) {
   };
 }
 
+async function searchComicVineVolumes(seriesTitle, env) {
+  var volUpstream = await fetchWithTimeout(
+    "https://comicvine.gamespot.com/api/search/?api_key=" + env.COMICVINE_API_KEY +
+      "&format=json&resources=volume&query=" + encodeURIComponent(seriesTitle) +
+      "&field_list=id,name,start_year,count_of_issues,image",
+    CV_HEADERS
+  );
+  var volData = await volUpstream.json();
+  if (volData.error && volData.error !== "OK") return [];
+  return (volData.results || []).sort(function (a, b) {
+    return (b.count_of_issues || 0) - (a.count_of_issues || 0);
+  });
+}
+
 async function searchComicVine(title, env) {
   if (!env.COMICVINE_API_KEY) {
     return json({ error: "ComicVine key not configured yet." }, 501);
@@ -159,42 +181,33 @@ async function searchComicVine(title, env) {
   if (issueMatch) {
     var items = await searchComicVineByIssueNumber(issueMatch[1].trim(), issueMatch[2], env);
     if (items.length) return json({ items: items }, 200);
-    // Fall through to plain search if nothing matched that exact issue.
+    // Fall through to the series picker if nothing matched that exact issue.
   }
 
-  const upstream = await fetchWithTimeout(
-    "https://comicvine.gamespot.com/api/search/?api_key=" + env.COMICVINE_API_KEY +
-      "&format=json&resources=issue&query=" + encodeURIComponent(title) +
-      "&field_list=name,image,volume,issue_number,cover_date",
-    CV_HEADERS
-  );
-  const data = await upstream.json();
-
-  if (data.error && data.error !== "OK") {
-    return json({ error: "ComicVine: " + data.error }, 502);
-  }
-
-  return json({ items: (data.results || []).slice(0, 8).map(cvItem) }, 200);
+  // No issue number given: a plain issue-text search mostly returns
+  // whichever single volume has the most/newest issues, repeated — not
+  // useful for "what Green Lantern comics exist." Show distinct series
+  // (eras/reboots) instead; picking one drills into its issue list
+  // (kind=comic-issues) rather than adding something directly.
+  var volumes = await searchComicVineVolumes(issueMatch ? issueMatch[1].trim() : title, env);
+  var items = volumes.slice(0, 8).map(function (v) {
+    return {
+      title: v.name + (v.start_year ? " (" + v.start_year + ")" : ""),
+      image: (v.image && (v.image.small_url || v.image.thumb_url)) || "",
+      meta: "Comic series" + (v.count_of_issues ? " · " + v.count_of_issues + " issues" : ""),
+      volumeId: v.id
+    };
+  });
+  return json({ items: items }, 200);
 }
 
 async function searchComicVineByIssueNumber(seriesTitle, issueNumber, env) {
-  var volUpstream = await fetchWithTimeout(
-    "https://comicvine.gamespot.com/api/search/?api_key=" + env.COMICVINE_API_KEY +
-      "&format=json&resources=volume&query=" + encodeURIComponent(seriesTitle) +
-      "&field_list=id,name,count_of_issues",
-    CV_HEADERS
-  );
-  var volData = await volUpstream.json();
-  if (volData.error && volData.error !== "OK") return [];
-
   // Multiple volumes often share a series name (reboots/relaunches). The
   // one with the most issues is almost always the "main" ongoing series
   // readers mean when they just say a title and a number — not a perfect
   // heuristic, but far better than plain text search. Check the top few in
   // case the biggest one doesn't happen to have that specific issue.
-  var candidates = (volData.results || [])
-    .sort(function (a, b) { return (b.count_of_issues || 0) - (a.count_of_issues || 0); })
-    .slice(0, 3);
+  var candidates = (await searchComicVineVolumes(seriesTitle, env)).slice(0, 3);
 
   var results = await Promise.all(
     candidates.map(function (vol) {
@@ -211,6 +224,25 @@ async function searchComicVineByIssueNumber(seriesTitle, issueNumber, env) {
   );
 
   return results.flat().map(cvItem);
+}
+
+async function listComicVineIssues(volumeId, env) {
+  if (!env.COMICVINE_API_KEY) {
+    return json({ error: "ComicVine key not configured yet." }, 501);
+  }
+
+  const upstream = await fetchWithTimeout(
+    "https://comicvine.gamespot.com/api/issues/?api_key=" + env.COMICVINE_API_KEY +
+      "&format=json&filter=volume:" + encodeURIComponent(volumeId) +
+      "&sort=cover_date:desc&limit=20" +
+      "&field_list=name,image,volume,issue_number,cover_date",
+    CV_HEADERS
+  );
+  const data = await upstream.json();
+  if (data.error && data.error !== "OK") {
+    return json({ error: "ComicVine: " + data.error }, 502);
+  }
+  return json({ items: (data.results || []).map(cvItem) }, 200);
 }
 
 async function searchJikan(title) {

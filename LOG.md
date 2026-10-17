@@ -137,3 +137,25 @@ single exact issue isn't in the biggest one. This is a heuristic, not a
 guarantee — an obscure reboot's issue 363 could still be missed. Falls back
 to the old plain-text search if no number is found or no exact match comes
 back.
+
+## 2026-10-17 (comic browsing + dead-end fix)
+
+**Where the plan broke:** two reports from real use. (1) Searching a bare
+series name like "Green Lantern" or "Batman" returned ~10 near-duplicate
+issues, almost all from whichever single volume happens to dominate
+ComicVine's issue search — not useful for seeing what eras/runs exist. (2)
+When Jikan was down, the manga search showed "...or enter manually," but
+there was no actual way to reach plain manual entry from there — comics and
+manga route "Enter Manually" to the search form now, so a failed/empty
+search was a dead end.
+
+**Decided:**
+- A bare series search (no trailing issue number) now searches ComicVine
+  volumes instead of issues, returning distinct series/eras to pick from
+  (e.g. "Green Lantern (1960)," "(1990)," "(2005)," "(2011)"...). Picking
+  one drills into that specific series' issue list (`kind=comic-issues`) to
+  pick the actual issue — a three-step flow (series → issues → confirm)
+  instead of one flat dump.
+- Added a persistent "Can't find it? Enter it manually instead" link on the
+  search form itself, so a bad/failed/empty search always has an escape
+  hatch to plain manual entry, pre-filled with whatever was typed.

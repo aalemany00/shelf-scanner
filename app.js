@@ -87,6 +87,7 @@
     el.searchForm = document.getElementById("searchForm");
     el.searchTitleInput = document.getElementById("searchTitleInput");
     el.cancelSearchBtn = document.getElementById("cancelSearchBtn");
+    el.searchToManualBtn = document.getElementById("searchToManualBtn");
     el.searchResults = document.getElementById("searchResults");
     el.manualForm = document.getElementById("manualForm");
     el.titleInput = document.getElementById("titleInput");
@@ -133,6 +134,12 @@
       }
     });
     el.cancelSearchBtn.addEventListener("click", hideSearchForm);
+    el.searchToManualBtn.addEventListener("click", function () {
+      var typed = el.searchTitleInput.value.trim();
+      hideSearchForm();
+      showManualForm();
+      el.titleInput.value = typed;
+    });
     el.searchForm.addEventListener("submit", function (e) {
       e.preventDefault();
       var title = el.searchTitleInput.value.trim();
@@ -310,9 +317,24 @@
   function runSearch(title) {
     var kind = SEARCH_KIND[state.category];
     if (!kind) return;
+    runSearchUrl(
+      LOOKUP_PROXY_URL + "/search?kind=" + kind + "&title=" + encodeURIComponent(title),
+      "No matches for \"" + title + "\" — try a different search or add it manually."
+    );
+  }
 
+  // Drills into one comic series: picking a series from the general search
+  // (see the worker's searchComicVine) doesn't add it directly, since a
+  // series isn't a single item — it lists that series' issues to pick from.
+  function runComicIssueSearch(volumeId, seriesLabel) {
+    runSearchUrl(
+      LOOKUP_PROXY_URL + "/search?kind=comic-issues&volumeId=" + encodeURIComponent(volumeId),
+      "No issues found for " + seriesLabel + " — enter it manually instead."
+    );
+  }
+
+  function runSearchUrl(url, emptyMessage) {
     setStatus("Searching...");
-    var url = LOOKUP_PROXY_URL + "/search?kind=" + kind + "&title=" + encodeURIComponent(title);
 
     fetch(url)
       .then(function (res) { return res.json(); })
@@ -323,11 +345,7 @@
           return;
         }
         var items = data.items || [];
-        if (!items.length) {
-          setStatus("No matches for \"" + title + "\" — try a different search or add it manually.");
-        } else {
-          setStatus("");
-        }
+        setStatus(items.length ? "" : emptyMessage);
         renderSearchResults(items);
       })
       .catch(function () {
@@ -347,6 +365,10 @@
         '<img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
         "<span>" + escapeHtml(item.title) + "</span>";
       btn.addEventListener("click", function () {
+        if (item.volumeId) {
+          runComicIssueSearch(item.volumeId, item.title);
+          return;
+        }
         hideSearchForm();
         showConfirmPanel({
           category: state.category,
