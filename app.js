@@ -398,11 +398,26 @@
     el.scannerWrap.classList.remove("hidden");
     setStatus("Point the camera at the barcode.");
 
-    state.scanner = new Html5Qrcode("reader");
+    // formatsToSupport narrows the decoder to barcode types that actually
+    // appear on retail items, which the library's docs say improves
+    // detection speed/accuracy over scanning for every format at once.
+    var scannerConfig = { verbose: false };
+    if (typeof Html5QrcodeSupportedFormats !== "undefined") {
+      scannerConfig.formatsToSupport = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ];
+    }
+    state.scanner = new Html5Qrcode("reader", scannerConfig);
     state.scanner
       .start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 120 } },
+        { fps: 15, qrbox: { width: 300, height: 150 }, disableFlip: true },
         onScanSuccess,
         function () {} // ignore per-frame "not found" noise
       )
