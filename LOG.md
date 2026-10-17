@@ -203,3 +203,8 @@ would be expensive):**
 star ratings, reviews, variant-edition tracking — all real features on
 League of Comic Geeks, left out as scope creep beyond a personal cataloging
 tool.
+
+**Verified (hadn't been tested specifically until asked):** movie barcode
+scanning uses the same UPC lookup path as games, and a real Blu-ray UPC
+(Source Code, 2011) correctly returned its title, cover art, and category
+through the Worker.
