@@ -255,3 +255,22 @@ picked era showed in a seemingly random order.
   truncated to the first 100 issues fetched (discovered testing a
   205-issue Green Lantern run); added pagination up to 500 issues per
   volume, fetched in parallel.
+
+## 2026-10-18 (ISBN search for manga/comics)
+
+**Planned:** Adrian noticed manga/graphic-novel volumes carry a real
+ISBN-13 barcode on the back cover (separate from the UPC path comics
+already skip) and asked for a way to search by that number directly.
+
+**Built:** a "Search by ISBN" button next to "Enter Manually," shown only
+in Comics & Manga. First tried Google Books (free, keyless) for the
+ISBN-to-title lookup, but its anonymous API quota turned out to be
+exhausted globally — not something fixable from our side, confirmed by
+hitting the raw Google Books endpoint directly and getting a 429 with a
+`quota_limit_value` of 0. Switched to Open Library's ISBN API instead,
+which is also free and keyless and is built specifically for ISBN
+lookups; its `covers.openlibrary.org` endpoint supplies the cover image
+directly from the ISBN with no extra lookup step. Verified end to end in
+the browser: searched a real ISBN (One Piece Vol. 1), got back the title,
+cover art, and year, added it to the collection, and confirmed it showed
+up correctly on the Have It shelf before removing the test entry.

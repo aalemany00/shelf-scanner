@@ -17,6 +17,12 @@
 //     from ComicVine plus manga titles from Jikan to pick from — see
 //     comic-issues for drilling into a ComicVine series' issue list.
 //   GET /search?kind=comic-issues&volumeId=... -> that series' issue list
+//   GET /search?kind=isbn&isbn=...            -> Open Library, by ISBN
+//     (printed manga/graphic-novel volumes carry a real ISBN-13 barcode on
+//     the back cover — neither ComicVine nor Jikan search by ISBN, so this
+//     is a separate lookup, not a mode of the ComicVine/Jikan title search.
+//     Google Books was tried first but its keyless/anonymous quota is
+//     exhausted globally — not something fixable from our side.)
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +66,8 @@ async function handleUpcLookup(url) {
 var SEARCH_SOURCE_NAME = {
   movie: "OMDb",
   game: "RAWG",
-  comic: "ComicVine/Jikan"
+  comic: "ComicVine/Jikan",
+  isbn: "Open Library"
 };
 
 async function handleSearch(url, env) {
@@ -76,6 +83,12 @@ async function handleSearch(url, env) {
       const volumeId = url.searchParams.get("volumeId") || "";
       if (!volumeId) return json({ error: "Missing volumeId parameter." }, 400);
       return await listComicVineIssues(volumeId, env);
+    }
+
+    if (kind === "isbn") {
+      const isbn = (url.searchParams.get("isbn") || "").replace(/[^0-9Xx]/g, "");
+      if (!isbn) return json({ error: "Missing isbn parameter." }, 400);
+      return await searchByIsbn(isbn);
     }
 
     const title = (url.searchParams.get("title") || "").trim();
@@ -291,6 +304,28 @@ async function listComicVineIssues(volumeId, env) {
   });
 
   return json({ items: results.map(cvItem) }, 200);
+}
+
+// Open Library is free, keyless, and indexes by ISBN — the barcode actually
+// printed on a manga/graphic-novel volume. (Google Books also does this but
+// its keyless/anonymous quota is exhausted globally as of this writing.)
+// Cover images come from Open Library's separate covers.openlibrary.org
+// endpoint, which takes an ISBN directly with no lookup step of its own.
+async function searchByIsbn(isbn) {
+  const upstream = await fetchWithTimeout(
+    "https://openlibrary.org/api/books?bibkeys=ISBN:" + encodeURIComponent(isbn) + "&format=json&jscmd=data"
+  );
+  const data = await upstream.json();
+  const book = data["ISBN:" + isbn];
+  if (!book) return json({ items: [] }, 200);
+
+  const item = {
+    title: book.title + (book.subtitle ? ": " + book.subtitle : ""),
+    seriesName: book.title,
+    image: "https://covers.openlibrary.org/b/isbn/" + encodeURIComponent(isbn) + "-M.jpg",
+    meta: "Comic/Manga" + (book.publish_date ? " · " + book.publish_date : "")
+  };
+  return json({ items: [item] }, 200);
 }
 
 async function searchJikanItems(title) {

@@ -34,6 +34,7 @@
       <div class="add-actions">
         <button id="scanBtn" class="btn primary">Scan Barcode</button>
         <button id="typeBtn" class="btn">Enter Manually</button>
+        <button id="isbnBtn" class="btn hidden">Search by ISBN</button>
       </div>
       <p class="scan-hint">Zoom in so the barcode fills most of the frame — decoding needs the bars to be large.</p>
 
@@ -53,6 +54,15 @@
           <button type="button" id="cancelSearchBtn" class="btn">Cancel</button>
         </div>
         <button type="button" id="searchToManualBtn" class="link-btn">Can't find it? Enter it manually instead</button>
+      </form>
+
+      <form id="isbnForm" class="manual-form hidden">
+        <input type="text" id="isbnInput" placeholder="ISBN (the barcode on the back cover)" autocomplete="off" inputmode="numeric">
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Search</button>
+          <button type="button" id="cancelIsbnBtn" class="btn">Cancel</button>
+        </div>
+        <button type="button" id="isbnToManualBtn" class="link-btn">Can't find it? Enter it manually instead</button>
       </form>
 
       <div id="searchResults" class="search-results hidden"></div>

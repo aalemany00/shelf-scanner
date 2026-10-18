@@ -13,6 +13,10 @@
   var CATEGORIES = ["game", "figure", "comic", "movie"];
   var CATEGORY_LABELS = { game: "Games", figure: "Figures", comic: "Comics & Manga", movie: "Movies" };
   var NO_SCAN = { comic: true };
+  // Printed manga/graphic-novel volumes carry a real ISBN-13 barcode on the
+  // back cover — a separate lookup from the title search above, not a mode
+  // of it, since ComicVine/Jikan don't search by ISBN.
+  var SHOW_ISBN = { comic: true };
   // Categories with a title-search API wired up in the Worker (worker/src/index.js).
   var SEARCH_KIND = { movie: "movie", game: "game", comic: "comic" };
   var STATUS_KEYS = ["have", "want", "read"];
@@ -84,6 +88,7 @@
     el.tabs = document.getElementById("categoryTabs");
     el.scanBtn = document.getElementById("scanBtn");
     el.typeBtn = document.getElementById("typeBtn");
+    el.isbnBtn = document.getElementById("isbnBtn");
     el.scanHint = document.querySelector(".scan-hint");
     el.scanInput = document.getElementById("scanInput");
     el.scanPreviewWrap = document.getElementById("scanPreviewWrap");
@@ -93,6 +98,10 @@
     el.cancelSearchBtn = document.getElementById("cancelSearchBtn");
     el.searchToManualBtn = document.getElementById("searchToManualBtn");
     el.searchResults = document.getElementById("searchResults");
+    el.isbnForm = document.getElementById("isbnForm");
+    el.isbnInput = document.getElementById("isbnInput");
+    el.cancelIsbnBtn = document.getElementById("cancelIsbnBtn");
+    el.isbnToManualBtn = document.getElementById("isbnToManualBtn");
     el.manualForm = document.getElementById("manualForm");
     el.titleInput = document.getElementById("titleInput");
     el.imageInput = document.getElementById("imageInput");
@@ -159,6 +168,22 @@
       if (!title) return;
       runSearch(title);
     });
+
+    el.isbnBtn.addEventListener("click", showIsbnForm);
+    el.cancelIsbnBtn.addEventListener("click", hideIsbnForm);
+    el.isbnToManualBtn.addEventListener("click", function () {
+      var typed = el.isbnInput.value.trim();
+      hideIsbnForm();
+      showManualForm();
+      el.notesInput.value = typed ? "ISBN " + typed : "";
+    });
+    el.isbnForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var isbn = el.isbnInput.value.trim();
+      if (!isbn) return;
+      runIsbnSearch(isbn);
+    });
+
     el.cancelManualBtn.addEventListener("click", hideManualForm);
     el.manualForm.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -270,6 +295,7 @@
     el.attribution.classList.toggle("hidden", state.category !== "game");
     el.scanBtn.classList.toggle("hidden", !!NO_SCAN[state.category]);
     el.scanHint.classList.toggle("hidden", !!NO_SCAN[state.category]);
+    el.isbnBtn.classList.toggle("hidden", !SHOW_ISBN[state.category]);
   }
 
   function setCategory(cat) {
@@ -281,6 +307,7 @@
     renderGrid();
     hideManualForm();
     hideSearchForm();
+    hideIsbnForm();
     hideConfirmPanel();
   }
 
@@ -464,6 +491,7 @@
   function showManualForm() {
     hideConfirmPanel();
     hideSearchForm();
+    hideIsbnForm();
     el.manualForm.classList.remove("hidden");
     el.titleInput.focus();
   }
@@ -477,6 +505,7 @@
 
   function showSearchForm() {
     hideManualForm();
+    hideIsbnForm();
     hideConfirmPanel();
     el.searchForm.classList.remove("hidden");
     el.searchTitleInput.focus();
@@ -495,6 +524,34 @@
     runSearchUrl(
       LOOKUP_PROXY_URL + "/search?kind=" + kind + "&title=" + encodeURIComponent(title),
       "No matches for \"" + title + "\" — try a different search or add it manually."
+    );
+  }
+
+  // ---------- ISBN search ----------
+  //
+  // Separate from the title search above: printed manga/graphic-novel
+  // volumes carry a real ISBN-13 barcode on the back cover, which neither
+  // ComicVine nor Jikan search by. Resolved via Google Books instead.
+
+  function showIsbnForm() {
+    hideManualForm();
+    hideSearchForm();
+    hideConfirmPanel();
+    el.isbnForm.classList.remove("hidden");
+    el.isbnInput.focus();
+  }
+
+  function hideIsbnForm() {
+    el.isbnForm.classList.add("hidden");
+    el.isbnForm.reset();
+    el.searchResults.classList.add("hidden");
+    el.searchResults.innerHTML = "";
+  }
+
+  function runIsbnSearch(isbn) {
+    runSearchUrl(
+      LOOKUP_PROXY_URL + "/search?kind=isbn&isbn=" + encodeURIComponent(isbn),
+      "No matches for ISBN " + isbn + " — try a different number or add it manually."
     );
   }
 
