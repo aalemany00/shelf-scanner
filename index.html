@@ -75,6 +75,7 @@
           <button type="button" class="subkind-chip" data-subkind="book">Book</button>
           <button type="button" class="subkind-chip" data-subkind="manga">Manga</button>
         </div>
+        <input type="text" id="authorInput" class="hidden" placeholder="Author (optional)" autocomplete="off">
         <input type="text" id="imageInput" placeholder="Cover image URL (optional)" autocomplete="off">
         <input type="text" id="notesInput" placeholder="Notes (optional)" autocomplete="off">
         <div class="form-actions">
@@ -119,6 +120,20 @@
         <button type="button" class="status-tab active" data-status="have">Have It</button>
         <button type="button" class="status-tab" data-status="want">Want It</button>
         <button type="button" class="status-tab" data-status="read">Read It</button>
+      </div>
+
+      <!-- Books & Manga shelf only: how to order each shelf. "Custom" is the
+           drag-to-reorder order (see bindShelfDrag in app.js); dragging while
+           a different sort is active adopts the order on screen as the new
+           custom order and switches back to it. -->
+      <div id="bookSortRow" class="sort-row hidden">
+        <select id="bookSortMethod" class="sort-select" aria-label="Sort shelf by">
+          <option value="custom">Custom order</option>
+          <option value="alpha">Alphabetical</option>
+          <option value="added">Date added</option>
+          <option value="author">Author</option>
+        </select>
+        <button type="button" id="bookSortDirectionBtn" class="btn" aria-label="Sort ascending">&uarr;</button>
       </div>
 
       <input type="text" id="collectionSearchInput" class="collection-search" placeholder="Search your collection...">

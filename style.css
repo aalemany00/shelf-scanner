@@ -272,6 +272,32 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
 .status-tab.active[data-status="want"] { background: var(--yellow); color: var(--ink); }
 .status-tab.active[data-status="read"] { background: var(--blue); color: #fff; }
 
+.sort-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.sort-select {
+  flex: 1;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius);
+  border: 2px solid var(--ink);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.sort-row .btn {
+  flex: none;
+  width: 48px;
+  padding: 0.5rem;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
 .collection-search {
   display: block;
   width: 100%;

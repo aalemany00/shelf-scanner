@@ -2,6 +2,7 @@
   "use strict";
 
   var STORAGE_KEY = "shelfScanner.items";
+  var BOOK_SORT_KEY = "shelfScanner.bookSort"; // a view preference, not collection data
   // UPCitemdb blocks browser-side calls via CORS, so this Worker proxies the
   // lookup server-side. See worker/src/index.js.
   var LOOKUP_PROXY_URL = "https://shelf-scanner-upc.adrian-alemany2-ae1.workers.dev";
@@ -38,7 +39,8 @@
     seriesOverlaySeries: null, // the series currently open in the drill-down overlay
     comicStatusFilter: "have", // which shelf (Have/Want/Read) is showing, for any WITH_SHELVES category
     collectionSearch: "", // filters the currently-displayed grid, lowercased
-    editingId: null // set while the manual form is editing an already-saved item, see editItemBtn
+    editingId: null, // set while the manual form is editing an already-saved item, see editItemBtn
+    bookSort: loadBookSort() // how the Books & Manga shelf is ordered — {method, direction}
   };
 
   // Tracks Firestore writes still in flight: id -> "add" or "delete".
@@ -143,6 +145,7 @@
     el.isbnToManualBtn = document.getElementById("isbnToManualBtn");
     el.manualForm = document.getElementById("manualForm");
     el.titleInput = document.getElementById("titleInput");
+    el.authorInput = document.getElementById("authorInput");
     el.imageInput = document.getElementById("imageInput");
     el.notesInput = document.getElementById("notesInput");
     el.manualDuplicateWarning = document.getElementById("manualDuplicateWarning");
@@ -162,6 +165,9 @@
     el.statusMsg = document.getElementById("statusMsg");
     el.collectionTitle = document.getElementById("collectionTitle");
     el.comicStatusTabs = document.getElementById("comicStatusTabs");
+    el.bookSortRow = document.getElementById("bookSortRow");
+    el.bookSortMethod = document.getElementById("bookSortMethod");
+    el.bookSortDirectionBtn = document.getElementById("bookSortDirectionBtn");
     el.collectionSearchInput = document.getElementById("collectionSearchInput");
     el.grid = document.getElementById("grid");
     el.emptyMsg = document.getElementById("emptyMsg");
@@ -243,14 +249,16 @@
       var title = el.titleInput.value.trim();
       if (!title) return;
       var subKind = state.category === "book" ? getActiveSubKind(el.manualSubKindRow) : undefined;
+      var author = state.category === "book" ? el.authorInput.value.trim() : "";
 
       if (state.editingId) {
-        updateItem(state.editingId, title, el.imageInput.value.trim(), el.notesInput.value.trim(), subKind);
+        updateItem(state.editingId, title, el.imageInput.value.trim(), el.notesInput.value.trim(), subKind, author);
       } else {
         addItem({
           category: state.category,
           title: title,
           seriesName: title,
+          author: author,
           image: el.imageInput.value.trim(),
           notes: el.notesInput.value.trim(),
           subKind: subKind,
@@ -276,6 +284,7 @@
       el.titleInput.value = state.pendingMatch.title || "";
       el.imageInput.value = state.pendingMatch.image || "";
       el.notesInput.value = state.pendingMatch.notes || "";
+      el.authorInput.value = state.pendingMatch.author || "";
       hideConfirmPanel();
       showManualForm();
       renderSubKindRow(el.manualSubKindRow, subKind);
@@ -301,6 +310,7 @@
       el.titleInput.value = item.title || "";
       el.imageInput.value = item.image || "";
       el.notesInput.value = item.notes || "";
+      el.authorInput.value = item.author || "";
       el.manualSubmitBtn.textContent = "Save Changes";
       hideItemOverlay();
       showManualForm();
@@ -354,6 +364,17 @@
 
     el.collectionSearchInput.addEventListener("input", function () {
       state.collectionSearch = el.collectionSearchInput.value.trim().toLowerCase();
+      renderGrid();
+    });
+
+    el.bookSortMethod.addEventListener("change", function () {
+      state.bookSort.method = el.bookSortMethod.value;
+      saveBookSort();
+      renderGrid();
+    });
+    el.bookSortDirectionBtn.addEventListener("click", function () {
+      state.bookSort.direction = state.bookSort.direction === "desc" ? "asc" : "desc";
+      saveBookSort();
       renderGrid();
     });
   }
@@ -463,6 +484,22 @@
     }
   }
 
+  // How the Books & Manga shelf is sorted is a per-device view preference,
+  // not collection data — kept out of state.items/Firestore on purpose.
+  function loadBookSort() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(BOOK_SORT_KEY));
+      if (parsed && parsed.method && parsed.direction) return parsed;
+    } catch (e) {}
+    return { method: "custom", direction: "asc" };
+  }
+
+  function saveBookSort() {
+    try {
+      localStorage.setItem(BOOK_SORT_KEY, JSON.stringify(state.bookSort));
+    } catch (e) {}
+  }
+
   function findItemById(id) {
     return state.items.filter(function (it) { return it.id === id; })[0];
   }
@@ -489,6 +526,7 @@
       id: String(Date.now()) + Math.random().toString(16).slice(2),
       category: category,
       title: data.title || "Untitled",
+      author: data.author || "",
       image: data.image || "",
       upc: data.upc || "",
       notes: data.notes || "",
@@ -538,12 +576,13 @@
   // Edits an already-saved item's title/image/notes in place (see
   // editItemBtn) — addItem is only ever for something not yet in the
   // collection, this is for fixing up something that already is.
-  function updateItem(id, title, image, notes, subKind) {
+  function updateItem(id, title, image, notes, subKind, author) {
     var item = findItemById(id);
     if (!item) return;
     item.title = title;
     item.image = image;
     item.notes = notes;
+    item.author = author || "";
     if (subKind) item.subKind = subKind;
     saveItems();
     renderGrid();
@@ -567,6 +606,8 @@
     el.collectionTitle.textContent = CATEGORY_LABELS[state.category];
     var withShelves = WITH_SHELVES[state.category];
     el.comicStatusTabs.classList.toggle("hidden", !withShelves);
+    el.bookSortRow.classList.toggle("hidden", state.category !== "book");
+    if (state.category === "book") renderBookSortControls();
 
     var items = state.items.filter(function (it) { return it.category === state.category; });
 
@@ -638,8 +679,9 @@
   // split into their own sections (item.subKind, see the add/edit forms'
   // Book/Manga toggle) and shown flat, one tile per item — unlike comics,
   // there's rarely more than a copy or two of the same book, so there's no
-  // need to collapse into series tiles. Order within a section is a plain
-  // user-set sequence (item.sortIndex), draggable via bindShelfDrag.
+  // need to collapse into series tiles. Order within a section comes from
+  // state.bookSort (see sortBookItems) — custom drag order by default, or
+  // alphabetical/date-added/author, each ascending or descending.
   var SHELF_ITEM_WIDTH = 92; // keep in sync with .shelf-item's width in style.css
 
   function renderBookShelf(container, items) {
@@ -658,11 +700,7 @@
     sections.forEach(function (section) {
       if (!section.items.length) return;
 
-      section.items.sort(function (a, b) {
-        var ai = typeof a.sortIndex === "number" ? a.sortIndex : 0;
-        var bi = typeof b.sortIndex === "number" ? b.sortIndex : 0;
-        return ai - bi;
-      });
+      section.items = sortBookItems(section.items);
 
       var sectionEl = document.createElement("div");
       sectionEl.className = "shelf-section";
@@ -683,6 +721,37 @@
 
       container.appendChild(sectionEl);
     });
+  }
+
+  // Four ways to look at a shelf section: the user's own drag-and-drop
+  // order (sortIndex), alphabetical by title, oldest/newest added, or by
+  // author — each flippable top-to-bottom or bottom-to-top. Returns a new
+  // array; never mutates the one passed in.
+  function sortBookItems(items) {
+    var method = state.bookSort.method;
+    var sorted = items.slice();
+    if (method === "alpha") {
+      sorted.sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); });
+    } else if (method === "added") {
+      sorted.sort(function (a, b) { return (a.addedAt || "").localeCompare(b.addedAt || ""); });
+    } else if (method === "author") {
+      sorted.sort(function (a, b) { return (a.author || "").localeCompare(b.author || ""); });
+    } else {
+      sorted.sort(function (a, b) {
+        var ai = typeof a.sortIndex === "number" ? a.sortIndex : 0;
+        var bi = typeof b.sortIndex === "number" ? b.sortIndex : 0;
+        return ai - bi;
+      });
+    }
+    if (state.bookSort.direction === "desc") sorted.reverse();
+    return sorted;
+  }
+
+  function renderBookSortControls() {
+    el.bookSortMethod.value = state.bookSort.method;
+    var asc = state.bookSort.direction !== "desc";
+    el.bookSortDirectionBtn.textContent = asc ? "↑" : "↓";
+    el.bookSortDirectionBtn.setAttribute("aria-label", asc ? "Sort ascending" : "Sort descending");
   }
 
   function buildShelfTile(item, groupKey) {
@@ -799,10 +868,13 @@
   // group so order is unambiguous — simpler and more robust than trying to
   // patch individual values.
   function reorderShelfItem(movedItem, targetId, before, groupKey) {
-    var group = state.items
-      .filter(function (it) { return it.category === "book" && (it.subKind || "book") === groupKey; })
-      .sort(function (a, b) { return (a.sortIndex || 0) - (b.sortIndex || 0); })
-      .filter(function (it) { return it.id !== movedItem.id; });
+    // Whatever order is currently on screen becomes the new custom order —
+    // dragging while sorted some other way (alphabetical, by author, ...)
+    // adopts that order as the baseline, applies the move on top of it, and
+    // switches the shelf back to "Custom" so the drop is what you see next.
+    var group = sortBookItems(
+      state.items.filter(function (it) { return it.category === "book" && (it.subKind || "book") === groupKey; })
+    ).filter(function (it) { return it.id !== movedItem.id; });
 
     var targetIndex = -1;
     group.forEach(function (it, i) { if (it.id === targetId) targetIndex = i; });
@@ -810,6 +882,9 @@
 
     group.splice(before ? targetIndex : targetIndex + 1, 0, movedItem);
     group.forEach(function (it, i) { it.sortIndex = i; });
+
+    state.bookSort = { method: "custom", direction: "asc" };
+    saveBookSort();
 
     saveItems();
     renderGrid();
@@ -857,7 +932,9 @@
     el.itemOverlay.dataset.id = item.id;
     el.itemImage.src = item.image || "";
     el.itemTitle.textContent = item.title;
-    el.itemMeta.textContent = CATEGORY_LABELS[item.category] + (item.upc ? " · " + item.upc : "");
+    el.itemMeta.textContent = CATEGORY_LABELS[item.category] +
+      (item.author ? " · " + item.author : "") +
+      (item.upc ? " · " + item.upc : "");
     el.itemNotes.textContent = item.notes || "";
     el.itemStatusRow.classList.toggle("hidden", !WITH_SHELVES[item.category]);
     if (WITH_SHELVES[item.category]) renderStatusRow(el.itemStatusRow, item.status);
@@ -882,6 +959,7 @@
     hideIsbnForm();
     el.manualForm.classList.remove("hidden");
     el.manualSubKindRow.classList.toggle("hidden", state.category !== "book");
+    el.authorInput.classList.toggle("hidden", state.category !== "book");
     el.titleInput.focus();
   }
 
@@ -1000,6 +1078,7 @@
           seriesName: item.seriesName || item.title,
           image: item.image || "",
           meta: item.meta || "",
+          author: item.author || "",
           likelyManga: item.likelyManga,
           notes: "",
           source: SEARCH_KIND[state.category]
@@ -1016,7 +1095,9 @@
     state.pendingStatus = WITH_SHELVES[match.category] ? (match.status || defaultStatus()) : null;
     el.confirmImage.src = match.image || "";
     el.confirmTitle.textContent = match.title;
-    el.confirmMeta.textContent = match.meta || match.upc || "";
+    var metaText = match.meta || match.upc || "";
+    if (match.author) metaText = metaText ? metaText + " · " + match.author : match.author;
+    el.confirmMeta.textContent = metaText;
     el.confirmStatusRow.classList.toggle("hidden", !WITH_SHELVES[match.category]);
     if (WITH_SHELVES[match.category]) renderStatusRow(el.confirmStatusRow, state.pendingStatus);
 
@@ -1186,6 +1267,7 @@
           seriesName: item.seriesName || item.title,
           image: item.image || "",
           meta: item.meta || "",
+          author: item.author || "",
           likelyManga: item.likelyManga,
           upc: isbn,
           notes: "",

@@ -425,3 +425,36 @@ real (Demon Slayer volumes, Wizard's First Rule) and said the covers read
 too small. Scaled them up from 64x100px (14px plank) to 92x142px (18px
 plank), same proportions, verified against his real shelf without
 touching his real entries.
+
+**Follow-up (same day):** a section wrapping to a second row put the next
+row's covers flush against the previous row's plank — no breathing room.
+Added a 14px gap above every row after the first in a section.
+
+## 2026-10-19 (sort the Books & Manga shelf)
+
+**Planned:** Adrian wanted multiple ways to order each shelf — alphabetical,
+date added, by author — each flippable top-to-bottom or bottom-to-top, on
+top of the drag-and-drop order already there.
+
+**Built:**
+- A sort control (a method dropdown + a direction toggle button) above the
+  Books & Manga shelf: Custom order (the existing drag order), Alphabetical,
+  Date added, or Author, each ascending or descending. Persisted per device
+  in localStorage — it's a view preference, not collection data, so it
+  doesn't sync or touch Firestore.
+- Author didn't exist as a field before today. Added an Author input to the
+  manual-entry/edit form (Books & Manga only), and the Worker now pulls it
+  from Open Library's `authors` array on an ISBN lookup, shown in the
+  confirm panel and item detail alongside the existing title/meta.
+- Dragging a cover while sorted some other way (say, Alphabetical) adopts
+  whatever order is currently on screen as the new baseline, applies the
+  drag on top of it, and switches the control back to Custom — so the drop
+  is exactly what you see next, rather than being a no-op or snapping back
+  to a stale manual order.
+- Verified against the real collection: alphabetical sort correctly put
+  "It" before "Wizard's First Rule," descending reversed it, author sort
+  grouped by the (currently mostly blank) author field correctly, date
+  added matched real timestamps, and dragging while sorted by Date Added
+  correctly re-baselined to Custom and persisted through a full reload.
+  Removed the one test entry (with a test author) afterward and confirmed
+  the real shelf was untouched.

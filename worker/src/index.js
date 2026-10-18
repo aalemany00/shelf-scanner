@@ -321,11 +321,14 @@ async function searchByIsbn(isbn) {
     return ((s.name || "") + (s.url || "")).toLowerCase().indexOf("manga") !== -1;
   });
 
+  const author = (book.authors || []).map(function (a) { return a.name; }).filter(Boolean).join(", ");
+
   const item = {
     title: book.title + (book.subtitle ? ": " + book.subtitle : ""),
     seriesName: book.title,
     image: "https://covers.openlibrary.org/b/isbn/" + encodeURIComponent(isbn) + "-M.jpg",
     meta: "Book" + (book.publish_date ? " · " + book.publish_date : ""),
+    author: author,
     likelyManga: likelyManga
   };
   return json({ items: [item] }, 200);
