@@ -374,3 +374,48 @@ previously the only options were Remove, Move, or toggling status.
   edit; separately added a real-ISBN test book, confirmed the duplicate
   warning fired on a second ISBN search for it, and removed the test
   entry afterward.
+
+## 2026-10-18 (visual bookshelf for Books & Manga)
+
+**Planned:** the first real Layer 2 piece — moving Books & Manga off the
+grid everything else uses and onto something that actually looks like a
+shelf. Explored directions as Design-canvas mockups first (same process
+as the Famicom restyle) rather than guessing in code: a classic wood
+shelf with loosely leaning covers, a cartridge-rack take continuing the
+Famicom theme, a tight "library ledge," and a hybrid. Adrian also pointed
+me at Shelfy, a real book-tracking app, for reference — picked up its
+tightly-packed, no-gap covers and wood-plank shelf rows, but skipped its
+decorative mixed-in photos/props per Adrian's explicit "no random images"
+note. Also asked for: reorganizing the shelf (drag and drop, not
+simplified arrows — Adrian's call), and keeping books and manga visually
+separate on the shelf rather than mixed in one row.
+
+**Built:**
+- Books & Manga now renders as a packed shelf instead of a grid: covers
+  sit edge to edge on a wood-plank row (same cream/red/ink Famicom
+  palette as the rest of the app), wrapping to a new row once one fills
+  up. No decorative filler — every tile is a real owned item.
+- Books and manga are split into their own "Books" and "Manga" sections
+  on the shelf. Since there's nothing on a saved item recording which it
+  is, added a Book/Manga toggle to the confirm panel and the manual
+  entry/edit form, defaulting from a signal Open Library actually
+  exposes — it tags manga editions with a "form:manga" subject, which the
+  Worker now checks (`likelyManga`) — always changeable either way.
+- Shelf order is a real drag-and-drop: press and hold a cover to pick it
+  up, drag it over another cover in the same section, drop it there.
+  Built by hand with Pointer Events rather than HTML5 drag-and-drop,
+  which doesn't fire on touchscreens at all — this is a phone-first app,
+  so that wasn't an option. A plain tap still opens the item as before;
+  only a held drag is treated as a reorder.
+- Comics keeps its existing series-grouped grid untouched — this shelf
+  treatment is Books & Manga only, since comics' "many issues of the same
+  series" shape doesn't fit a flat packed shelf the way a handful of
+  book/manga copies does.
+- Verified end to end against the real collection: searched a real manga
+  ISBN and confirmed the Manga toggle defaulted correctly, added a real
+  book and confirmed Book defaulted instead, added a second manual book,
+  dragged it in front of the first and confirmed the new order survived a
+  full reload (reached Firestore, not just local storage), then removed
+  all three test entries and confirmed the real collection was left
+  clean. Also re-checked Comics, Figures, and Games to confirm their
+  grids were untouched by the change.

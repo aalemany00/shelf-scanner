@@ -34,6 +34,7 @@
     items: loadItems(),
     pendingMatch: null, // the item waiting in the confirm panel
     pendingStatus: null, // {have, want, read} being edited in the confirm panel
+    pendingSubKind: null, // "book" or "manga" being edited in the confirm panel
     seriesOverlaySeries: null, // the series currently open in the drill-down overlay
     comicStatusFilter: "have", // which shelf (Have/Want/Read) is showing, for any WITH_SHELVES category
     collectionSearch: "", // filters the currently-displayed grid, lowercased
@@ -145,6 +146,7 @@
     el.imageInput = document.getElementById("imageInput");
     el.notesInput = document.getElementById("notesInput");
     el.manualDuplicateWarning = document.getElementById("manualDuplicateWarning");
+    el.manualSubKindRow = document.getElementById("manualSubKindRow");
     el.manualSubmitBtn = document.getElementById("manualSubmitBtn");
     el.cancelManualBtn = document.getElementById("cancelManualBtn");
     el.confirmPanel = document.getElementById("confirmPanel");
@@ -152,6 +154,7 @@
     el.confirmTitle = document.getElementById("confirmTitle");
     el.confirmMeta = document.getElementById("confirmMeta");
     el.confirmDuplicateWarning = document.getElementById("confirmDuplicateWarning");
+    el.confirmSubKindRow = document.getElementById("confirmSubKindRow");
     el.confirmStatusRow = document.getElementById("confirmStatusRow");
     el.confirmAddBtn = document.getElementById("confirmAddBtn");
     el.confirmEditBtn = document.getElementById("confirmEditBtn");
@@ -196,6 +199,7 @@
         showSearchForm();
       } else {
         showManualForm();
+        if (state.category === "book") renderSubKindRow(el.manualSubKindRow, "book");
       }
     });
     el.cancelSearchBtn.addEventListener("click", hideSearchForm);
@@ -219,6 +223,7 @@
       hideIsbnForm();
       showManualForm();
       el.notesInput.value = typed ? "ISBN " + typed : "";
+      if (state.category === "book") renderSubKindRow(el.manualSubKindRow, "book");
     });
     el.isbnForm.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -231,14 +236,16 @@
       var dup = findDuplicate(state.category, el.titleInput.value, "", state.editingId);
       el.manualDuplicateWarning.classList.toggle("hidden", !dup);
     });
+    bindSubKindRow(el.manualSubKindRow);
     el.cancelManualBtn.addEventListener("click", hideManualForm);
     el.manualForm.addEventListener("submit", function (e) {
       e.preventDefault();
       var title = el.titleInput.value.trim();
       if (!title) return;
+      var subKind = state.category === "book" ? getActiveSubKind(el.manualSubKindRow) : undefined;
 
       if (state.editingId) {
-        updateItem(state.editingId, title, el.imageInput.value.trim(), el.notesInput.value.trim());
+        updateItem(state.editingId, title, el.imageInput.value.trim(), el.notesInput.value.trim(), subKind);
       } else {
         addItem({
           category: state.category,
@@ -246,6 +253,7 @@
           seriesName: title,
           image: el.imageInput.value.trim(),
           notes: el.notesInput.value.trim(),
+          subKind: subKind,
           source: "manual"
         });
       }
@@ -253,19 +261,24 @@
     });
 
     bindStatusRow(el.confirmStatusRow, function () { return state.pendingStatus; });
+    bindSubKindRow(el.confirmSubKindRow, function (value) { state.pendingSubKind = value; });
 
     el.confirmAddBtn.addEventListener("click", function () {
       if (!state.pendingMatch) return;
-      addItem(Object.assign({}, state.pendingMatch, { status: state.pendingStatus }));
+      var data = Object.assign({}, state.pendingMatch, { status: state.pendingStatus });
+      if (state.pendingMatch.category === "book") data.subKind = state.pendingSubKind;
+      addItem(data);
       hideConfirmPanel();
     });
     el.confirmEditBtn.addEventListener("click", function () {
       if (!state.pendingMatch) return;
+      var subKind = state.pendingMatch.category === "book" ? (state.pendingSubKind || "book") : "book";
       el.titleInput.value = state.pendingMatch.title || "";
       el.imageInput.value = state.pendingMatch.image || "";
       el.notesInput.value = state.pendingMatch.notes || "";
       hideConfirmPanel();
       showManualForm();
+      renderSubKindRow(el.manualSubKindRow, subKind);
     });
     el.confirmCancelBtn.addEventListener("click", hideConfirmPanel);
 
@@ -291,12 +304,19 @@
       el.manualSubmitBtn.textContent = "Save Changes";
       hideItemOverlay();
       showManualForm();
+      if (item.category === "book") renderSubKindRow(el.manualSubKindRow, item.subKind || "book");
     });
     el.moveItemBtn.addEventListener("click", function () {
       var item = findItemById(el.itemOverlay.dataset.id);
       var swapTo = item && SHELF_SWAP[item.category];
       if (!swapTo) return;
       item.category = swapTo;
+      if (swapTo === "book") {
+        // The whole point of this button is relocating old manga entries
+        // that were miscategorized as comics before Books & Manga split off.
+        if (!item.subKind) item.subKind = "manga";
+        if (typeof item.sortIndex !== "number") item.sortIndex = nextSortIndex("book", item.subKind);
+      }
       saveItems();
       hideItemOverlay();
       renderGrid();
@@ -362,6 +382,30 @@
 
   function defaultStatus() {
     return { have: true, want: false, read: false };
+  }
+
+  // Book vs. manga is a single-select toggle (unlike the multi-select status
+  // row above) — used in both the confirm panel and the manual form so Books
+  // & Manga's shelf can separate the two. renderSubKindRow sets which chip is
+  // active; bindSubKindRow wires the click.
+  function renderSubKindRow(row, value) {
+    Array.prototype.forEach.call(row.children, function (chip) {
+      chip.classList.toggle("active", chip.dataset.subkind === value);
+    });
+  }
+
+  function bindSubKindRow(row, onChange) {
+    row.addEventListener("click", function (e) {
+      var chip = e.target.closest(".subkind-chip");
+      if (!chip) return;
+      renderSubKindRow(row, chip.dataset.subkind);
+      if (onChange) onChange(chip.dataset.subkind);
+    });
+  }
+
+  function getActiveSubKind(row) {
+    var active = row.querySelector(".subkind-chip.active");
+    return active ? active.dataset.subkind : "book";
   }
 
   // ---------- categories ----------
@@ -455,6 +499,10 @@
       item.seriesName = data.seriesName || data.title || "Untitled";
       item.status = data.status || defaultStatus();
     }
+    if (category === "book") {
+      item.subKind = data.subKind || "book";
+      item.sortIndex = nextSortIndex(category, item.subKind);
+    }
     state.items.push(item);
     saveItems();
     renderGrid();
@@ -474,15 +522,29 @@
     }
   }
 
+  // Shelf position within a (category, subKind) group — new items go to the
+  // end, and reorderShelfItem (see the shelf renderer) reassigns these when
+  // the user drags something to a new spot.
+  function nextSortIndex(category, subKind) {
+    var max = -1;
+    state.items.forEach(function (it) {
+      if (it.category === category && (it.subKind || "book") === subKind && typeof it.sortIndex === "number") {
+        if (it.sortIndex > max) max = it.sortIndex;
+      }
+    });
+    return max + 1;
+  }
+
   // Edits an already-saved item's title/image/notes in place (see
   // editItemBtn) — addItem is only ever for something not yet in the
   // collection, this is for fixing up something that already is.
-  function updateItem(id, title, image, notes) {
+  function updateItem(id, title, image, notes, subKind) {
     var item = findItemById(id);
     if (!item) return;
     item.title = title;
     item.image = image;
     item.notes = notes;
+    if (subKind) item.subKind = subKind;
     saveItems();
     renderGrid();
     setStatus("Updated.");
@@ -524,11 +586,14 @@
     }
 
     el.grid.innerHTML = "";
+    el.grid.className = state.category === "book" ? "shelf-grid" : "grid";
     var empty = items.length === 0;
     el.emptyMsg.classList.toggle("hidden", !(empty && !search));
     el.noMatchMsg.classList.toggle("hidden", !(empty && search));
 
-    if (withShelves) {
+    if (state.category === "book") {
+      renderBookShelf(el.grid, items);
+    } else if (withShelves) {
       renderSeriesGroupedGrid(el.grid, items);
     } else {
       renderFlatGrid(el.grid, items, showItemOverlay);
@@ -567,6 +632,191 @@
         showSeriesOverlay(seriesName, group);
       }));
     });
+  }
+
+  // Books & Manga: a packed shelf instead of a grid. Books and manga are
+  // split into their own sections (item.subKind, see the add/edit forms'
+  // Book/Manga toggle) and shown flat, one tile per item — unlike comics,
+  // there's rarely more than a copy or two of the same book, so there's no
+  // need to collapse into series tiles. Order within a section is a plain
+  // user-set sequence (item.sortIndex), draggable via bindShelfDrag.
+  var SHELF_ITEM_WIDTH = 64;
+
+  function renderBookShelf(container, items) {
+    var sections = [
+      { key: "book", label: "Books", items: [] },
+      { key: "manga", label: "Manga", items: [] }
+    ];
+    items.forEach(function (it) {
+      var key = it.subKind === "manga" ? "manga" : "book";
+      sections[key === "manga" ? 1 : 0].items.push(it);
+    });
+
+    var containerWidth = container.clientWidth || 320;
+    var perRow = Math.max(1, Math.floor(containerWidth / SHELF_ITEM_WIDTH));
+
+    sections.forEach(function (section) {
+      if (!section.items.length) return;
+
+      section.items.sort(function (a, b) {
+        var ai = typeof a.sortIndex === "number" ? a.sortIndex : 0;
+        var bi = typeof b.sortIndex === "number" ? b.sortIndex : 0;
+        return ai - bi;
+      });
+
+      var sectionEl = document.createElement("div");
+      sectionEl.className = "shelf-section";
+
+      var label = document.createElement("div");
+      label.className = "shelf-section-label";
+      label.textContent = section.label;
+      sectionEl.appendChild(label);
+
+      for (var i = 0; i < section.items.length; i += perRow) {
+        var row = document.createElement("div");
+        row.className = "shelf-row";
+        section.items.slice(i, i + perRow).forEach(function (item) {
+          row.appendChild(buildShelfTile(item, section.key));
+        });
+        sectionEl.appendChild(row);
+      }
+
+      container.appendChild(sectionEl);
+    });
+  }
+
+  function buildShelfTile(item, groupKey) {
+    var tile = document.createElement("div");
+    tile.className = "shelf-item";
+    tile.dataset.id = item.id;
+    tile.dataset.group = groupKey;
+    tile.innerHTML =
+      '<div class="shelf-cover"><img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
+      statusDotsHtml(item) +
+      "</div>" +
+      '<div class="shelf-plank"></div>';
+    tile.addEventListener("click", function () {
+      // Suppress the click a drag leaves behind — see bindShelfDrag.
+      if (tile.dataset.dragged === "1") {
+        tile.dataset.dragged = "";
+        return;
+      }
+      showItemOverlay(item);
+    });
+    bindShelfDrag(tile, item, groupKey);
+    return tile;
+  }
+
+  // Press-and-hold (not a plain tap, which should still open the item) to
+  // pick up a shelf tile, drag it over another tile in the same section, and
+  // drop it there. Uses Pointer Events so it works with touch, not just a
+  // mouse — HTML5 drag-and-drop doesn't fire on phones, and this is a
+  // phone-first app.
+  function bindShelfDrag(tile, item, groupKey) {
+    var HOLD_MS = 350;
+    var MOVE_THRESHOLD = 8;
+    var pointerId = null;
+    var startX = 0;
+    var startY = 0;
+    var dragging = false;
+    var holdTimer = null;
+    var ghost = null;
+    var dropTargetId = null;
+    var dropBefore = true;
+
+    function moveGhost(x, y) {
+      if (!ghost) return;
+      ghost.style.left = (x - ghost.offsetWidth / 2) + "px";
+      ghost.style.top = (y - 40) + "px";
+    }
+
+    function startDrag(x, y) {
+      dragging = true;
+      tile.dataset.dragged = "1";
+      tile.classList.add("dragging");
+      var rect = tile.getBoundingClientRect();
+      ghost = tile.cloneNode(true);
+      ghost.className = "shelf-item shelf-drag-ghost";
+      ghost.style.width = rect.width + "px";
+      document.body.appendChild(ghost);
+      moveGhost(x, y);
+      try { tile.setPointerCapture(pointerId); } catch (err) {}
+    }
+
+    function updateDropTarget(x, y) {
+      if (ghost) ghost.style.display = "none";
+      var under = document.elementFromPoint(x, y);
+      if (ghost) ghost.style.display = "";
+      var target = under && under.closest(".shelf-item");
+      if (!target || target.dataset.group !== groupKey || target === tile) {
+        dropTargetId = null;
+        return;
+      }
+      var rect = target.getBoundingClientRect();
+      dropBefore = x < rect.left + rect.width / 2;
+      dropTargetId = target.dataset.id;
+    }
+
+    function endDrag() {
+      clearTimeout(holdTimer);
+      if (dragging) {
+        if (dropTargetId) reorderShelfItem(item, dropTargetId, dropBefore, groupKey);
+        if (ghost) { ghost.remove(); ghost = null; }
+        tile.classList.remove("dragging");
+      }
+      dragging = false;
+      pointerId = null;
+    }
+
+    tile.addEventListener("pointerdown", function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      pointerId = e.pointerId;
+      startX = e.clientX;
+      startY = e.clientY;
+      dragging = false;
+      holdTimer = setTimeout(function () { startDrag(e.clientX, e.clientY); }, HOLD_MS);
+    });
+
+    tile.addEventListener("pointermove", function (e) {
+      if (e.pointerId !== pointerId) return;
+      if (!dragging) {
+        if (Math.abs(e.clientX - startX) > MOVE_THRESHOLD || Math.abs(e.clientY - startY) > MOVE_THRESHOLD) {
+          clearTimeout(holdTimer);
+        }
+        return;
+      }
+      e.preventDefault();
+      moveGhost(e.clientX, e.clientY);
+      updateDropTarget(e.clientX, e.clientY);
+    });
+
+    tile.addEventListener("pointerup", endDrag);
+    tile.addEventListener("pointercancel", endDrag);
+  }
+
+  // Splices movedItem next to the dropped-on item within their shared
+  // (category=book, subKind) group, then renumbers sortIndex for the whole
+  // group so order is unambiguous — simpler and more robust than trying to
+  // patch individual values.
+  function reorderShelfItem(movedItem, targetId, before, groupKey) {
+    var group = state.items
+      .filter(function (it) { return it.category === "book" && (it.subKind || "book") === groupKey; })
+      .sort(function (a, b) { return (a.sortIndex || 0) - (b.sortIndex || 0); })
+      .filter(function (it) { return it.id !== movedItem.id; });
+
+    var targetIndex = -1;
+    group.forEach(function (it, i) { if (it.id === targetId) targetIndex = i; });
+    if (targetIndex === -1) return;
+
+    group.splice(before ? targetIndex : targetIndex + 1, 0, movedItem);
+    group.forEach(function (it, i) { it.sortIndex = i; });
+
+    saveItems();
+    renderGrid();
+
+    if (window.ShelfSync) {
+      group.forEach(function (it) { window.ShelfSync.setItem(it).catch(function () {}); });
+    }
   }
 
   function buildGridTile(image, label, overlayHtml, onClick) {
@@ -631,6 +881,7 @@
     hideSearchForm();
     hideIsbnForm();
     el.manualForm.classList.remove("hidden");
+    el.manualSubKindRow.classList.toggle("hidden", state.category !== "book");
     el.titleInput.focus();
   }
 
@@ -749,6 +1000,7 @@
           seriesName: item.seriesName || item.title,
           image: item.image || "",
           meta: item.meta || "",
+          likelyManga: item.likelyManga,
           notes: "",
           source: SEARCH_KIND[state.category]
         });
@@ -770,6 +1022,12 @@
 
     var dup = findDuplicate(match.category, match.title, match.upc);
     el.confirmDuplicateWarning.classList.toggle("hidden", !dup);
+
+    el.confirmSubKindRow.classList.toggle("hidden", match.category !== "book");
+    if (match.category === "book") {
+      state.pendingSubKind = match.subKind || (match.likelyManga ? "manga" : "book");
+      renderSubKindRow(el.confirmSubKindRow, state.pendingSubKind);
+    }
 
     el.confirmPanel.classList.remove("hidden");
   }
@@ -928,6 +1186,7 @@
           seriesName: item.seriesName || item.title,
           image: item.image || "",
           meta: item.meta || "",
+          likelyManga: item.likelyManga,
           upc: isbn,
           notes: "",
           source: "isbn"
@@ -951,6 +1210,7 @@
       el.imageInput.value = "";
       el.notesInput.value = codeLabel + " " + code;
       showManualForm();
+      if (state.category === "book") renderSubKindRow(el.manualSubKindRow, "book");
     }
   }
 

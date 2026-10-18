@@ -71,6 +71,10 @@
       <form id="manualForm" class="manual-form hidden">
         <input type="text" id="titleInput" placeholder="Title" autocomplete="off">
         <p id="manualDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
+        <div id="manualSubKindRow" class="subkind-row hidden">
+          <button type="button" class="subkind-chip" data-subkind="book">Book</button>
+          <button type="button" class="subkind-chip" data-subkind="manga">Manga</button>
+        </div>
         <input type="text" id="imageInput" placeholder="Cover image URL (optional)" autocomplete="off">
         <input type="text" id="notesInput" placeholder="Notes (optional)" autocomplete="off">
         <div class="form-actions">
@@ -85,6 +89,10 @@
           <h3 id="confirmTitle"></h3>
           <p id="confirmMeta"></p>
           <p id="confirmDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
+          <div id="confirmSubKindRow" class="subkind-row hidden">
+            <button type="button" class="subkind-chip" data-subkind="book">Book</button>
+            <button type="button" class="subkind-chip" data-subkind="manga">Manga</button>
+          </div>
           <div id="confirmStatusRow" class="status-row hidden">
             <button type="button" class="status-chip" data-status="have">Have It</button>
             <button type="button" class="status-chip" data-status="want">Want It</button>
@@ -141,8 +149,9 @@
     </div>
   </div>
 
-  <!-- Comics/Books & Manga only: the collection grid groups owned items by series;
-       this lists the individual owned issues/volumes within one series. -->
+  <!-- Comics only: the collection grid groups owned items by series; this
+       lists the individual owned issues within one series. Books & Manga
+       shows every item directly on its shelf, no series grouping. -->
   <div id="seriesOverlay" class="overlay hidden">
     <div class="overlay-card series-card">
       <h3 id="seriesOverlayTitle"></h3>

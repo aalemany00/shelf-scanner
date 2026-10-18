@@ -313,11 +313,20 @@ async function searchByIsbn(isbn) {
   const book = data["ISBN:" + isbn];
   if (!book) return json({ items: [] }, 200);
 
+  // Open Library tags manga editions with a "form:manga" subject (seen on a
+  // real lookup during testing) — used client-side to default the Book/Manga
+  // toggle instead of always guessing "book."
+  const subjects = book.subjects || [];
+  const likelyManga = subjects.some(function (s) {
+    return ((s.name || "") + (s.url || "")).toLowerCase().indexOf("manga") !== -1;
+  });
+
   const item = {
     title: book.title + (book.subtitle ? ": " + book.subtitle : ""),
     seriesName: book.title,
     image: "https://covers.openlibrary.org/b/isbn/" + encodeURIComponent(isbn) + "-M.jpg",
-    meta: "Book" + (book.publish_date ? " · " + book.publish_date : "")
+    meta: "Book" + (book.publish_date ? " · " + book.publish_date : ""),
+    likelyManga: likelyManga
   };
   return json({ items: [item] }, 200);
 }
