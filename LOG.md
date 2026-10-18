@@ -208,3 +208,26 @@ tool.
 scanning uses the same UPC lookup path as games, and a real Blu-ray UPC
 (Source Code, 2011) correctly returned its title, cover art, and category
 through the Worker.
+
+## 2026-10-17 (visual theme)
+
+**Planned:** Adrian wanted the dark/neon look replaced. Previewed several
+directions as design-canvas mockups before touching real CSS (same
+"preview before committing" habit as Project World): a comic-pop palette, an
+indie-webcomic palette, a Y2K/scrapbook-sticker look, and a retro Japanese
+arcade/Famicom-box-art look pulled from his own Pinterest references.
+
+**Decided:** retro Japanese Famicom box-art theme — cream background,
+Famicom-red header banner with a sunburst accent, "Dela Gothic One" (a real
+Japanese-gothic display typeface) for headings, white cards with thick black
+borders and offset "sticker" drop shadows, chunky 3D-bevel buttons, and
+game-cartridge-style grid tiles (color block + black label strip).
+Deliberately kept Japanese text out of the functional UI itself (the mockup
+had a couple of decorative Japanese words) so the app stays plainly
+readable English — the aesthetic comes from type/color/shape, not
+untranslated flavor text.
+
+**Built:** rewrote `style.css` token-by-token onto the new palette, updated
+the manifest's theme colors and the favicon to match. Verified the real app
+(header, tabs, buttons, search results, confirm panel with Have/Want/Read
+chips, comic grid with cartridge tiles) end to end against the mockup.
