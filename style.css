@@ -244,6 +244,40 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
   margin-bottom: 0.75rem;
 }
 
+.status-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.status-tab {
+  flex: 1;
+  padding: 0.5rem 0.6rem;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.status-tab.active[data-status="have"] { background: var(--accent); color: #fff; }
+.status-tab.active[data-status="want"] { background: var(--yellow); color: var(--ink); }
+.status-tab.active[data-status="read"] { background: var(--blue); color: #fff; }
+
+.collection-search {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.9rem;
+  border-radius: var(--radius);
+  border: 2px solid var(--ink);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));

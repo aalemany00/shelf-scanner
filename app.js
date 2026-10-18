@@ -22,7 +22,9 @@
     items: loadItems(),
     pendingMatch: null, // the item waiting in the confirm panel
     pendingStatus: null, // {have, want, read} being edited in the confirm panel
-    seriesOverlaySeries: null // the series currently open in the drill-down overlay
+    seriesOverlaySeries: null, // the series currently open in the drill-down overlay
+    comicStatusFilter: "have", // which shelf (Have/Want/Read) Comics & Manga is showing
+    collectionSearch: "" // filters the currently-displayed grid, lowercased
   };
 
   var el = {};
@@ -106,8 +108,11 @@
     el.confirmCancelBtn = document.getElementById("confirmCancelBtn");
     el.statusMsg = document.getElementById("statusMsg");
     el.collectionTitle = document.getElementById("collectionTitle");
+    el.comicStatusTabs = document.getElementById("comicStatusTabs");
+    el.collectionSearchInput = document.getElementById("collectionSearchInput");
     el.grid = document.getElementById("grid");
     el.emptyMsg = document.getElementById("emptyMsg");
+    el.noMatchMsg = document.getElementById("noMatchMsg");
     el.itemOverlay = document.getElementById("itemOverlay");
     el.itemImage = document.getElementById("itemImage");
     el.itemTitle = document.getElementById("itemTitle");
@@ -212,6 +217,21 @@
     });
 
     el.closeSeriesBtn.addEventListener("click", hideSeriesOverlay);
+
+    el.comicStatusTabs.addEventListener("click", function (e) {
+      var btn = e.target.closest(".status-tab");
+      if (!btn) return;
+      state.comicStatusFilter = btn.dataset.status;
+      Array.prototype.forEach.call(el.comicStatusTabs.children, function (tab) {
+        tab.classList.toggle("active", tab === btn);
+      });
+      renderGrid();
+    });
+
+    el.collectionSearchInput.addEventListener("input", function () {
+      state.collectionSearch = el.collectionSearchInput.value.trim().toLowerCase();
+      renderGrid();
+    });
   }
 
   // A status row is used in two places (the confirm panel, before an item
@@ -255,6 +275,8 @@
   function setCategory(cat) {
     if (CATEGORIES.indexOf(cat) === -1) return;
     state.category = cat;
+    state.collectionSearch = "";
+    el.collectionSearchInput.value = "";
     renderTabs();
     renderGrid();
     hideManualForm();
@@ -322,11 +344,31 @@
 
   function renderGrid() {
     el.collectionTitle.textContent = CATEGORY_LABELS[state.category];
-    var items = state.items.filter(function (it) { return it.category === state.category; });
-    el.grid.innerHTML = "";
-    el.emptyMsg.classList.toggle("hidden", items.length > 0);
+    var isComic = state.category === "comic";
+    el.comicStatusTabs.classList.toggle("hidden", !isComic);
 
-    if (state.category === "comic") {
+    var items = state.items.filter(function (it) { return it.category === state.category; });
+
+    // Comics/manga: which shelf (Have/Want/Read) is showing. An item can be
+    // on more than one shelf at once (e.g. Have + Read), so this isn't an
+    // exclusive filter so much as "which of the three lists to look at."
+    if (isComic) {
+      items = items.filter(function (it) { return it.status && it.status[state.comicStatusFilter]; });
+    }
+
+    var search = state.collectionSearch;
+    if (search) {
+      items = items.filter(function (it) {
+        return (it.seriesName || it.title || "").toLowerCase().indexOf(search) !== -1;
+      });
+    }
+
+    el.grid.innerHTML = "";
+    var empty = items.length === 0;
+    el.emptyMsg.classList.toggle("hidden", !(empty && !search));
+    el.noMatchMsg.classList.toggle("hidden", !(empty && search));
+
+    if (isComic) {
       renderSeriesGroupedGrid(el.grid, items);
     } else {
       renderFlatGrid(el.grid, items, showItemOverlay);

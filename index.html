@@ -90,8 +90,21 @@
 
     <section class="collection">
       <h2 id="collectionTitle">Games</h2>
+
+      <!-- Comics/manga only: which status to browse. An item can be in more
+           than one (e.g. Have + Read), so these aren't mutually exclusive
+           filters so much as three different shelves. -->
+      <div id="comicStatusTabs" class="status-tabs hidden">
+        <button type="button" class="status-tab active" data-status="have">Have It</button>
+        <button type="button" class="status-tab" data-status="want">Want It</button>
+        <button type="button" class="status-tab" data-status="read">Read It</button>
+      </div>
+
+      <input type="text" id="collectionSearchInput" class="collection-search" placeholder="Search your collection...">
+
       <div id="grid" class="grid"></div>
       <p id="emptyMsg" class="empty-msg hidden">Nothing here yet — scan or add your first item.</p>
+      <p id="noMatchMsg" class="empty-msg hidden">No matches for your search.</p>
     </section>
   </main>
 

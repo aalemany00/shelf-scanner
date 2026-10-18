@@ -231,3 +231,27 @@ untranslated flavor text.
 the manifest's theme colors and the favicon to match. Verified the real app
 (header, tabs, buttons, search results, confirm panel with Have/Want/Read
 chips, comic grid with cartridge tiles) end to end against the mockup.
+
+## 2026-10-17 (convenience pass, 300+ comics)
+
+**Planned:** with a 300+ comic collection, Adrian needs to quickly check
+"do I already have this?" rather than scroll a wall of items. Also: the
+category tabs sat flush-left instead of centered, and issues within a
+picked era showed in a seemingly random order.
+
+**Built:**
+- Category tabs centered; "Comics" relabeled "Comics & Manga" (see above).
+- Comics & Manga now has three shelves — Have It / Want It / Read It —
+  instead of one mixed grid. An item can be on more than one shelf at once
+  (e.g. Have + Read); these are "which shelf to look at," not mutually
+  exclusive filters.
+- Added a search box above every category's grid (not just comics) that
+  filters the already-added collection by title, so a large list is
+  actually navigable.
+- Fixed two real ordering bugs in the Worker found while testing this:
+  ComicVine sorts `issue_number` as text ("1, 10, 11, 12, 2..."), so a
+  28-issue-and-up series was never in reading order — now sorted
+  numerically ourselves. Separately, the issue list was silently
+  truncated to the first 100 issues fetched (discovered testing a
+  205-issue Green Lantern run); added pagination up to 500 issues per
+  volume, fetched in parallel.
