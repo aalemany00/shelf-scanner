@@ -1,4 +1,4 @@
-var CACHE_NAME = "shelf-scanner-v1";
+var CACHE_NAME = "shelf-scanner-v2";
 var SHELL_FILES = [
   "./",
   "./index.html",
@@ -33,16 +33,19 @@ self.addEventListener("fetch", function (event) {
   // Never cache API calls — always go to the network for live lookups.
   if (req.url.indexOf("workers.dev") !== -1) return;
 
+  // Network-first: always try to fetch the latest version, and only fall
+  // back to the cache when offline. Cache-first was causing updates to
+  // require a manual force-quit-and-reopen of the browser, repeatedly,
+  // since it would keep serving a stale shell even with a live connection.
   event.respondWith(
-    caches.match(req).then(function (cached) {
-      return (
-        cached ||
-        fetch(req).then(function (res) {
-          var copy = res.clone();
-          caches.open(CACHE_NAME).then(function (cache) { cache.put(req, copy); });
-          return res;
-        })
-      );
-    })
+    fetch(req)
+      .then(function (res) {
+        var copy = res.clone();
+        caches.open(CACHE_NAME).then(function (cache) { cache.put(req, copy); });
+        return res;
+      })
+      .catch(function () {
+        return caches.match(req);
+      })
   );
 });
