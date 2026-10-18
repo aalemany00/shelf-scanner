@@ -198,6 +198,13 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
    buttons on a phone — let only the primary one claim extra space. */
 .confirm-panel .form-actions .btn:not(.primary) { flex: 0 1 auto; }
 
+.duplicate-warning {
+  margin: -0.3rem 0 0.6rem;
+  color: var(--accent-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .link-btn {
   display: block;
   margin-top: 0.6rem;

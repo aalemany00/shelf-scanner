@@ -343,3 +343,34 @@ second.
   Comics" button on it and then deleted it through the UI, reloading
   again afterward to confirm the delete reached Firestore too and the
   real collection was left clean.
+
+## 2026-10-18 (duplicate warning + editing an existing item)
+
+**Planned:** two convenience features, picked from a short list of
+suggestions: a warning before adding something already in the
+collection (relevant now that it's 300+ comics, easy to double-scan),
+and a way to fix a title/cover/notes after an item is already saved —
+previously the only options were Remove, Move, or toggling status.
+
+**Built:**
+- A shared duplicate check (same category, plus a matching barcode/ISBN
+  when both have one, else a case-insensitive exact title match —
+  checked against the full title, not the series name, so two different
+  issues of the same series don't flag each other). Shows "You already
+  have this in your collection" as a non-blocking warning: on the
+  confirm panel for scan/search/ISBN results, and live as you type in
+  the plain manual-entry form. Doesn't stop the add — sometimes a second
+  copy is intentional — it's a heads-up, not a gate.
+- An Edit button on every item's detail overlay, reusing the existing
+  manual-entry form (title/cover/notes) instead of a new one. Updates
+  the item in place rather than creating a duplicate; the duplicate
+  check correctly excludes the item being edited from matching itself.
+  The form's submit button relabels to "Save Changes" while editing so
+  it's clear this isn't adding a new item.
+- Verified both against the real synced collection: triggered the
+  duplicate warning against a real figure already owned, edited that
+  figure's notes and confirmed the change survived a full reload (really
+  reached Firestore, not just local storage), then reverted the test
+  edit; separately added a real-ISBN test book, confirmed the duplicate
+  warning fired on a second ISBN search for it, and removed the test
+  entry afterward.

@@ -36,7 +36,8 @@
     pendingStatus: null, // {have, want, read} being edited in the confirm panel
     seriesOverlaySeries: null, // the series currently open in the drill-down overlay
     comicStatusFilter: "have", // which shelf (Have/Want/Read) is showing, for any WITH_SHELVES category
-    collectionSearch: "" // filters the currently-displayed grid, lowercased
+    collectionSearch: "", // filters the currently-displayed grid, lowercased
+    editingId: null // set while the manual form is editing an already-saved item, see editItemBtn
   };
 
   // Tracks Firestore writes still in flight: id -> "add" or "delete".
@@ -143,11 +144,14 @@
     el.titleInput = document.getElementById("titleInput");
     el.imageInput = document.getElementById("imageInput");
     el.notesInput = document.getElementById("notesInput");
+    el.manualDuplicateWarning = document.getElementById("manualDuplicateWarning");
+    el.manualSubmitBtn = document.getElementById("manualSubmitBtn");
     el.cancelManualBtn = document.getElementById("cancelManualBtn");
     el.confirmPanel = document.getElementById("confirmPanel");
     el.confirmImage = document.getElementById("confirmImage");
     el.confirmTitle = document.getElementById("confirmTitle");
     el.confirmMeta = document.getElementById("confirmMeta");
+    el.confirmDuplicateWarning = document.getElementById("confirmDuplicateWarning");
     el.confirmStatusRow = document.getElementById("confirmStatusRow");
     el.confirmAddBtn = document.getElementById("confirmAddBtn");
     el.confirmEditBtn = document.getElementById("confirmEditBtn");
@@ -166,6 +170,7 @@
     el.itemStatusRow = document.getElementById("itemStatusRow");
     el.itemNotes = document.getElementById("itemNotes");
     el.deleteItemBtn = document.getElementById("deleteItemBtn");
+    el.editItemBtn = document.getElementById("editItemBtn");
     el.moveItemBtn = document.getElementById("moveItemBtn");
     el.closeItemBtn = document.getElementById("closeItemBtn");
     el.seriesOverlay = document.getElementById("seriesOverlay");
@@ -222,19 +227,28 @@
       runIsbnSearch(isbn);
     });
 
+    el.titleInput.addEventListener("input", function () {
+      var dup = findDuplicate(state.category, el.titleInput.value, "", state.editingId);
+      el.manualDuplicateWarning.classList.toggle("hidden", !dup);
+    });
     el.cancelManualBtn.addEventListener("click", hideManualForm);
     el.manualForm.addEventListener("submit", function (e) {
       e.preventDefault();
       var title = el.titleInput.value.trim();
       if (!title) return;
-      addItem({
-        category: state.category,
-        title: title,
-        seriesName: title,
-        image: el.imageInput.value.trim(),
-        notes: el.notesInput.value.trim(),
-        source: "manual"
-      });
+
+      if (state.editingId) {
+        updateItem(state.editingId, title, el.imageInput.value.trim(), el.notesInput.value.trim());
+      } else {
+        addItem({
+          category: state.category,
+          title: title,
+          seriesName: title,
+          image: el.imageInput.value.trim(),
+          notes: el.notesInput.value.trim(),
+          source: "manual"
+        });
+      }
       hideManualForm();
     });
 
@@ -267,6 +281,17 @@
     });
 
     el.closeItemBtn.addEventListener("click", hideItemOverlay);
+    el.editItemBtn.addEventListener("click", function () {
+      var item = findItemById(el.itemOverlay.dataset.id);
+      if (!item) return;
+      state.editingId = item.id;
+      el.titleInput.value = item.title || "";
+      el.imageInput.value = item.image || "";
+      el.notesInput.value = item.notes || "";
+      el.manualSubmitBtn.textContent = "Save Changes";
+      hideItemOverlay();
+      showManualForm();
+    });
     el.moveItemBtn.addEventListener("click", function () {
       var item = findItemById(el.itemOverlay.dataset.id);
       var swapTo = item && SHELF_SWAP[item.category];
@@ -398,6 +423,22 @@
     return state.items.filter(function (it) { return it.id === id; })[0];
   }
 
+  // A likely duplicate: same category and either a matching barcode/ISBN (the
+  // strongest signal, when both have one) or the same title, case- and
+  // whitespace-insensitive. Checked on title rather than seriesName so two
+  // different issues/volumes of the same series don't flag each other.
+  // excludeId lets the item being edited skip matching against itself.
+  function findDuplicate(category, title, upc, excludeId) {
+    var t = (title || "").trim().toLowerCase();
+    if (!t) return null;
+    return state.items.filter(function (it) {
+      if (it.id === excludeId) return false;
+      if (it.category !== category) return false;
+      if (upc && it.upc && it.upc === upc) return true;
+      return (it.title || "").trim().toLowerCase() === t;
+    })[0] || null;
+  }
+
   function addItem(data) {
     var category = data.category || state.category;
     var item = {
@@ -429,6 +470,31 @@
         .then(function () { delete pendingWrites[item.id]; })
         .catch(function () {
           setStatus("Added locally, but sync failed — will stay on this device for now.");
+        });
+    }
+  }
+
+  // Edits an already-saved item's title/image/notes in place (see
+  // editItemBtn) — addItem is only ever for something not yet in the
+  // collection, this is for fixing up something that already is.
+  function updateItem(id, title, image, notes) {
+    var item = findItemById(id);
+    if (!item) return;
+    item.title = title;
+    item.image = image;
+    item.notes = notes;
+    saveItems();
+    renderGrid();
+    setStatus("Updated.");
+
+    if (window.ShelfSync) {
+      // Same protection an add gets: don't let a stale snapshot undo this
+      // edit before the write confirms.
+      pendingWrites[item.id] = "add";
+      window.ShelfSync.setItem(item)
+        .then(function () { delete pendingWrites[item.id]; })
+        .catch(function () {
+          setStatus("Updated locally, but sync failed — will stay on this device for now.");
         });
     }
   }
@@ -571,6 +637,9 @@
   function hideManualForm() {
     el.manualForm.classList.add("hidden");
     el.manualForm.reset();
+    el.manualDuplicateWarning.classList.add("hidden");
+    el.manualSubmitBtn.textContent = "Add to Collection";
+    state.editingId = null;
   }
 
   // ---------- title search ----------
@@ -698,6 +767,10 @@
     el.confirmMeta.textContent = match.meta || match.upc || "";
     el.confirmStatusRow.classList.toggle("hidden", !WITH_SHELVES[match.category]);
     if (WITH_SHELVES[match.category]) renderStatusRow(el.confirmStatusRow, state.pendingStatus);
+
+    var dup = findDuplicate(match.category, match.title, match.upc);
+    el.confirmDuplicateWarning.classList.toggle("hidden", !dup);
+
     el.confirmPanel.classList.remove("hidden");
   }
 

@@ -70,10 +70,11 @@
 
       <form id="manualForm" class="manual-form hidden">
         <input type="text" id="titleInput" placeholder="Title" autocomplete="off">
+        <p id="manualDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
         <input type="text" id="imageInput" placeholder="Cover image URL (optional)" autocomplete="off">
         <input type="text" id="notesInput" placeholder="Notes (optional)" autocomplete="off">
         <div class="form-actions">
-          <button type="submit" class="btn primary">Add to Collection</button>
+          <button type="submit" id="manualSubmitBtn" class="btn primary">Add to Collection</button>
           <button type="button" id="cancelManualBtn" class="btn">Cancel</button>
         </div>
       </form>
@@ -83,6 +84,7 @@
         <div class="confirm-info">
           <h3 id="confirmTitle"></h3>
           <p id="confirmMeta"></p>
+          <p id="confirmDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
           <div id="confirmStatusRow" class="status-row hidden">
             <button type="button" class="status-chip" data-status="have">Have It</button>
             <button type="button" class="status-chip" data-status="want">Want It</button>
@@ -132,6 +134,7 @@
       <p id="itemNotes"></p>
       <div class="form-actions">
         <button id="deleteItemBtn" class="btn danger">Remove</button>
+        <button id="editItemBtn" class="btn">Edit</button>
         <button id="moveItemBtn" class="btn hidden">Move</button>
         <button id="closeItemBtn" class="btn">Close</button>
       </div>
