@@ -419,3 +419,9 @@ separate on the shelf rather than mixed in one row.
   all three test entries and confirmed the real collection was left
   clean. Also re-checked Comics, Figures, and Games to confirm their
   grids were untouched by the change.
+
+**Follow-up (same day):** Adrian had already started using the shelf for
+real (Demon Slayer volumes, Wizard's First Rule) and said the covers read
+too small. Scaled them up from 64x100px (14px plank) to 92x142px (18px
+plank), same proportions, verified against his real shelf without
+touching his real entries.
