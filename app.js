@@ -6,20 +6,28 @@
   // lookup server-side. See worker/src/index.js.
   var LOOKUP_PROXY_URL = "https://shelf-scanner-upc.adrian-alemany2-ae1.workers.dev";
 
-  // Manga isn't a separate category: it's just another publisher/series
-  // within the same comic model (same as how a real comics database like
-  // League of Comic Geeks treats it) — no barcode lookup applies to comics
-  // either way, so that category hides the Scan button entirely.
-  var CATEGORIES = ["game", "figure", "comic", "movie"];
-  var CATEGORY_LABELS = { game: "Games", figure: "Figures", comic: "Comics & Manga", movie: "Movies" };
+  // Manga lives in Books (combined with regular books), not Comics — a
+  // single-issue comic has no ISBN and isn't a "book" the way a manga
+  // volume or a trade paperback is. No barcode lookup applies to loose
+  // comic issues either way, so that category hides the Scan button.
+  var CATEGORIES = ["game", "figure", "comic", "book", "movie"];
+  var CATEGORY_LABELS = { game: "Games", figure: "Figures", comic: "Comics", book: "Books & Manga", movie: "Movies" };
   var NO_SCAN = { comic: true };
-  // Printed manga/graphic-novel volumes carry a real ISBN-13 barcode on the
-  // back cover — a separate lookup from the title search above, not a mode
-  // of it, since ComicVine/Jikan don't search by ISBN.
-  var SHOW_ISBN = { comic: true };
+  // Printed books/manga carry a real ISBN-13 barcode on the back cover —
+  // scanning it goes straight through the ISBN lookup (see onScanSuccess),
+  // and it's also offered as a typed search since not every copy scans
+  // cleanly. Trade-paperback comics have one too, so Comics gets it as well.
+  var SHOW_ISBN = { comic: true, book: true };
   // Categories with a title-search API wired up in the Worker (worker/src/index.js).
   var SEARCH_KIND = { movie: "movie", game: "game", comic: "comic" };
   var STATUS_KEYS = ["have", "want", "read"];
+  // Categories tracked as a collection with Have/Want/Read shelves and a
+  // series-grouped grid, rather than a flat one-tile-per-item list.
+  var WITH_SHELVES = { comic: true, book: true };
+  // Lets an existing item be reassigned between the two shelved categories
+  // from its overlay — there's no stored signal distinguishing an old manga
+  // entry from a western comic, so moving one over is a manual action.
+  var SHELF_SWAP = { comic: "book", book: "comic" };
 
   var state = {
     category: "game",
@@ -27,7 +35,7 @@
     pendingMatch: null, // the item waiting in the confirm panel
     pendingStatus: null, // {have, want, read} being edited in the confirm panel
     seriesOverlaySeries: null, // the series currently open in the drill-down overlay
-    comicStatusFilter: "have", // which shelf (Have/Want/Read) Comics & Manga is showing
+    comicStatusFilter: "have", // which shelf (Have/Want/Read) is showing, for any WITH_SHELVES category
     collectionSearch: "" // filters the currently-displayed grid, lowercased
   };
 
@@ -129,6 +137,7 @@
     el.itemStatusRow = document.getElementById("itemStatusRow");
     el.itemNotes = document.getElementById("itemNotes");
     el.deleteItemBtn = document.getElementById("deleteItemBtn");
+    el.moveItemBtn = document.getElementById("moveItemBtn");
     el.closeItemBtn = document.getElementById("closeItemBtn");
     el.seriesOverlay = document.getElementById("seriesOverlay");
     el.seriesOverlayTitle = document.getElementById("seriesOverlayTitle");
@@ -229,6 +238,16 @@
     });
 
     el.closeItemBtn.addEventListener("click", hideItemOverlay);
+    el.moveItemBtn.addEventListener("click", function () {
+      var item = findItemById(el.itemOverlay.dataset.id);
+      var swapTo = item && SHELF_SWAP[item.category];
+      if (!swapTo) return;
+      item.category = swapTo;
+      saveItems();
+      hideItemOverlay();
+      renderGrid();
+      if (window.ShelfSync) window.ShelfSync.setItem(item).catch(function () {});
+    });
     el.deleteItemBtn.addEventListener("click", function () {
       var id = el.itemOverlay.dataset.id;
       state.items = state.items.filter(function (it) { return it.id !== id; });
@@ -317,7 +336,12 @@
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       var items = raw ? JSON.parse(raw) : [];
-      // Manga used to be its own category; fold any old test data into comics.
+      // Manga used to be its own category, then got folded into comics; it
+      // now lives in Books instead. Nothing about a saved item records
+      // whether it's manga or a western comic, so this can't be done
+      // automatically — existing comic entries stay put, and the item
+      // overlay's "Move to Books & Manga" / "Move to Comics" button lets
+      // you reassign the manga ones by hand.
       items.forEach(function (it) {
         if (it.category === "manga") it.category = "comic";
       });
@@ -351,7 +375,7 @@
       source: data.source || "manual",
       addedAt: new Date().toISOString()
     };
-    if (category === "comic") {
+    if (WITH_SHELVES[category]) {
       item.seriesName = data.seriesName || data.title || "Untitled";
       item.status = data.status || defaultStatus();
     }
@@ -371,15 +395,16 @@
 
   function renderGrid() {
     el.collectionTitle.textContent = CATEGORY_LABELS[state.category];
-    var isComic = state.category === "comic";
-    el.comicStatusTabs.classList.toggle("hidden", !isComic);
+    var withShelves = WITH_SHELVES[state.category];
+    el.comicStatusTabs.classList.toggle("hidden", !withShelves);
 
     var items = state.items.filter(function (it) { return it.category === state.category; });
 
-    // Comics/manga: which shelf (Have/Want/Read) is showing. An item can be
-    // on more than one shelf at once (e.g. Have + Read), so this isn't an
-    // exclusive filter so much as "which of the three lists to look at."
-    if (isComic) {
+    // Comics/Books & Manga: which shelf (Have/Want/Read) is showing. An item
+    // can be on more than one shelf at once (e.g. Have + Read), so this
+    // isn't an exclusive filter so much as "which of the three lists to
+    // look at."
+    if (withShelves) {
       items = items.filter(function (it) { return it.status && it.status[state.comicStatusFilter]; });
     }
 
@@ -395,7 +420,7 @@
     el.emptyMsg.classList.toggle("hidden", !(empty && !search));
     el.noMatchMsg.classList.toggle("hidden", !(empty && search));
 
-    if (isComic) {
+    if (withShelves) {
       renderSeriesGroupedGrid(el.grid, items);
     } else {
       renderFlatGrid(el.grid, items, showItemOverlay);
@@ -476,8 +501,13 @@
     el.itemTitle.textContent = item.title;
     el.itemMeta.textContent = CATEGORY_LABELS[item.category] + (item.upc ? " · " + item.upc : "");
     el.itemNotes.textContent = item.notes || "";
-    el.itemStatusRow.classList.toggle("hidden", item.category !== "comic");
-    if (item.category === "comic") renderStatusRow(el.itemStatusRow, item.status);
+    el.itemStatusRow.classList.toggle("hidden", !WITH_SHELVES[item.category]);
+    if (WITH_SHELVES[item.category]) renderStatusRow(el.itemStatusRow, item.status);
+
+    var swapTo = SHELF_SWAP[item.category];
+    el.moveItemBtn.classList.toggle("hidden", !swapTo);
+    if (swapTo) el.moveItemBtn.textContent = "Move to " + CATEGORY_LABELS[swapTo];
+
     el.itemOverlay.classList.remove("hidden");
   }
 
@@ -620,12 +650,12 @@
 
   function showConfirmPanel(match) {
     state.pendingMatch = match;
-    state.pendingStatus = match.category === "comic" ? (match.status || defaultStatus()) : null;
+    state.pendingStatus = WITH_SHELVES[match.category] ? (match.status || defaultStatus()) : null;
     el.confirmImage.src = match.image || "";
     el.confirmTitle.textContent = match.title;
     el.confirmMeta.textContent = match.meta || match.upc || "";
-    el.confirmStatusRow.classList.toggle("hidden", match.category !== "comic");
-    if (match.category === "comic") renderStatusRow(el.confirmStatusRow, state.pendingStatus);
+    el.confirmStatusRow.classList.toggle("hidden", !WITH_SHELVES[match.category]);
+    if (WITH_SHELVES[match.category]) renderStatusRow(el.confirmStatusRow, state.pendingStatus);
     el.confirmPanel.classList.remove("hidden");
   }
 
@@ -728,7 +758,11 @@
 
   function onScanSuccess(decodedText) {
     setStatus("Found code " + decodedText + " — looking it up...");
-    lookupUpc(decodedText);
+    if (state.category === "book") {
+      lookupIsbn(decodedText);
+    } else {
+      lookupUpc(decodedText);
+    }
   }
 
   // ---------- lookup ----------
@@ -740,7 +774,7 @@
       .then(function (data) {
         var item = data && data.items && data.items[0];
         if (!item) {
-          barcodeNotResolved(upc, "No match found for " + upc + ".");
+          barcodeNotResolved(upc, "No match found for " + upc + ".", "UPC");
           return;
         }
         showConfirmPanel({
@@ -755,13 +789,44 @@
         setStatus("");
       })
       .catch(function () {
-        barcodeNotResolved(upc, "Lookup failed (offline or rate-limited).");
+        barcodeNotResolved(upc, "Lookup failed (offline or rate-limited).", "UPC");
+      });
+  }
+
+  // Books carry their own ISBN-13 barcode, which UPCitemdb (a general retail
+  // database, not a book one) resolves poorly — send a scanned book barcode
+  // through the same Open Library lookup as the typed ISBN search instead
+  // (see runIsbnSearch).
+  function lookupIsbn(isbn) {
+    var url = LOOKUP_PROXY_URL + "/search?kind=isbn&isbn=" + encodeURIComponent(isbn);
+    fetch(url)
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var item = data && data.items && data.items[0];
+        if (!item) {
+          barcodeNotResolved(isbn, "No match found for ISBN " + isbn + ".", "ISBN");
+          return;
+        }
+        showConfirmPanel({
+          category: state.category,
+          title: item.title,
+          seriesName: item.seriesName || item.title,
+          image: item.image || "",
+          meta: item.meta || "",
+          upc: isbn,
+          notes: "",
+          source: "isbn"
+        });
+        setStatus("");
+      })
+      .catch(function () {
+        barcodeNotResolved(isbn, "Lookup failed (offline or rate-limited).", "ISBN");
       });
   }
 
   // When the barcode can't be resolved: fall back to a title search for
   // categories that have one wired up, otherwise plain manual entry.
-  function barcodeNotResolved(upc, reason) {
+  function barcodeNotResolved(code, reason, codeLabel) {
     if (SEARCH_KIND[state.category]) {
       setStatus(reason + " Type the title to search instead.");
       showSearchForm();
@@ -769,7 +834,7 @@
       setStatus(reason + " Enter it manually.");
       el.titleInput.value = "";
       el.imageInput.value = "";
-      el.notesInput.value = "UPC " + upc;
+      el.notesInput.value = codeLabel + " " + code;
       showManualForm();
     }
   }

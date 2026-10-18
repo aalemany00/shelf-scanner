@@ -274,3 +274,37 @@ directly from the ISBN with no extra lookup step. Verified end to end in
 the browser: searched a real ISBN (One Piece Vol. 1), got back the title,
 cover art, and year, added it to the collection, and confirmed it showed
 up correctly on the Have It shelf before removing the test entry.
+
+## 2026-10-18 (split Books & Manga out of Comics)
+
+**Planned:** Adrian realized he also has a plain book collection, and
+asked to split manga out of Comics into a new Books section combined with
+regular books — searchable by scan, manual entry, or ISBN.
+
+**Built:**
+- New "Books & Manga" category, alongside Comics rather than inside it.
+  Comics goes back to being western comics only (ComicVine title search,
+  no manga results mixed in); the old Jikan-based manga search is gone
+  entirely since manga's new home is ISBN-driven, not title-search-driven.
+- Books & Manga supports all three ways Adrian asked for: Scan Barcode
+  (a book's barcode *is* its ISBN, so a scan goes straight through the
+  same Open Library lookup as the typed ISBN search — UPCitemdb, a
+  general retail database, resolves books poorly), Enter Manually, and
+  Search by ISBN. Comics keeps ISBN search too, since trade paperbacks
+  carry one.
+- Both categories keep the Have/Want/Read shelves and series-grouped grid
+  from the comics work — generalized that logic (previously hardcoded to
+  "comic") to run off a small config list instead of adding a second copy.
+- There's no stored field on an existing item distinguishing "this was
+  manga" from "this was a western comic" (both went through the same code
+  path before today), so existing comic entries couldn't be auto-migrated.
+  Added a "Move to Books & Manga" / "Move to Comics" button in the item
+  detail overlay instead, so Adrian can reassign the manga ones by hand.
+- Found a pre-existing bug while testing, not caused by this change: an
+  item added right before a Firestore sync snapshot arrives can get wiped
+  by that snapshot if the write hasn't landed yet — reproduced by adding
+  a test book and watching it disappear on reload. Confirmed via the real
+  synced collection that nothing was actually left behind by testing.
+  Flagged to Adrian; not fixed as part of this change since it's a
+  separate, pre-existing issue across every category, not specific to
+  Books & Manga.

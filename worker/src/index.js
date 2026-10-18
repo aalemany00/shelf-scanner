@@ -10,19 +10,20 @@
 //   GET /?upc=XXXXXXXXXXXXX           -> UPCitemdb trial lookup (best-effort)
 //   GET /search?kind=movie&title=...  -> OMDb (by title)
 //   GET /search?kind=game&title=...   -> RAWG (by title)
-//   GET /search?kind=comic&title=...          -> ComicVine + Jikan combined
-//     (manga isn't a separate category client-side — it's just another
-//     series within the same comic model). A trailing issue number finds
-//     that exact ComicVine issue; otherwise returns distinct series/eras
-//     from ComicVine plus manga titles from Jikan to pick from — see
-//     comic-issues for drilling into a ComicVine series' issue list.
+//   GET /search?kind=comic&title=...  -> ComicVine (western comics only —
+//     manga lives in the client's Books & Manga category, not Comics, and
+//     has no title-search API of its own; see kind=isbn below). A trailing
+//     issue number finds that exact ComicVine issue; otherwise returns
+//     distinct series/eras to pick from — see comic-issues for drilling
+//     into one series' issue list.
 //   GET /search?kind=comic-issues&volumeId=... -> that series' issue list
-//   GET /search?kind=isbn&isbn=...            -> Open Library, by ISBN
-//     (printed manga/graphic-novel volumes carry a real ISBN-13 barcode on
-//     the back cover — neither ComicVine nor Jikan search by ISBN, so this
-//     is a separate lookup, not a mode of the ComicVine/Jikan title search.
-//     Google Books was tried first but its keyless/anonymous quota is
-//     exhausted globally — not something fixable from our side.)
+//   GET /search?kind=isbn&isbn=...    -> Open Library, by ISBN (printed
+//     books and manga volumes carry a real ISBN-13 barcode on the back
+//     cover — this is what both the client's Books & Manga barcode scan
+//     and its typed ISBN search resolve through, and Comics offers it too
+//     for trade paperbacks). Google Books was tried first but its
+//     keyless/anonymous quota is exhausted globally — not fixable from our
+//     side — so this goes through Open Library instead.
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -66,7 +67,7 @@ async function handleUpcLookup(url) {
 var SEARCH_SOURCE_NAME = {
   movie: "OMDb",
   game: "RAWG",
-  comic: "ComicVine/Jikan",
+  comic: "ComicVine",
   isbn: "Open Library"
 };
 
@@ -74,10 +75,9 @@ async function handleSearch(url, env) {
   const kind = url.searchParams.get("kind") || "";
 
   // A single try/catch around every upstream call: any of these free-tier
-  // APIs can be slow, rate-limited, or just down (Jikan hit a sustained
-  // outage during development), and a raw timeout/network error here would
-  // otherwise surface as an opaque Cloudflare error page with no CORS
-  // headers, which the app can't show a useful message for.
+  // APIs can be slow, rate-limited, or just down, and a raw timeout/network
+  // error here would otherwise surface as an opaque Cloudflare error page
+  // with no CORS headers, which the app can't show a useful message for.
   try {
     if (kind === "comic-issues") {
       const volumeId = url.searchParams.get("volumeId") || "";
@@ -192,35 +192,29 @@ async function searchComicVine(title, env) {
   if (issueMatch && env.COMICVINE_API_KEY) {
     var exact = await searchComicVineByIssueNumber(issueMatch[1].trim(), issueMatch[2], env);
     if (exact.length) return json({ items: exact }, 200);
-    // Fall through to the series/manga picker if nothing matched that exact issue.
+    // Fall through to the series picker if nothing matched that exact issue.
   }
 
   // No issue number (or no exact match): a plain issue-text search mostly
   // returns whichever single volume has the most/newest issues, repeated —
   // not useful for "what Green Lantern comics exist." Show distinct series
-  // (eras/reboots) instead, plus manga titles from Jikan (manga isn't a
-  // separate category — just another series in the same model). Picking a
-  // ComicVine series drills into its issue list (kind=comic-issues); picking
-  // a manga title adds it directly, since Jikan doesn't expose per-volume
-  // records the way ComicVine does.
+  // (eras/reboots) instead; picking one drills into its issue list
+  // (kind=comic-issues).
   var seriesTitle = issueMatch ? issueMatch[1].trim() : title;
-  var comicItems = [];
-  if (env.COMICVINE_API_KEY) {
-    var volumes = await searchComicVineVolumes(seriesTitle, env);
-    comicItems = volumes.slice(0, 6).map(function (v) {
-      return {
-        title: v.name + (v.start_year ? " (" + v.start_year + ")" : ""),
-        seriesName: v.name,
-        image: (v.image && (v.image.small_url || v.image.thumb_url)) || "",
-        meta: "Comic series" + (v.count_of_issues ? " · " + v.count_of_issues + " issues" : ""),
-        volumeId: v.id
-      };
-    });
-  }
+  if (!env.COMICVINE_API_KEY) return json({ items: [] }, 200);
 
-  var mangaItems = await searchJikanItems(seriesTitle).catch(function () { return []; });
+  var volumes = await searchComicVineVolumes(seriesTitle, env);
+  var comicItems = volumes.slice(0, 6).map(function (v) {
+    return {
+      title: v.name + (v.start_year ? " (" + v.start_year + ")" : ""),
+      seriesName: v.name,
+      image: (v.image && (v.image.small_url || v.image.thumb_url)) || "",
+      meta: "Comic series" + (v.count_of_issues ? " · " + v.count_of_issues + " issues" : ""),
+      volumeId: v.id
+    };
+  });
 
-  return json({ items: comicItems.concat(mangaItems) }, 200);
+  return json({ items: comicItems }, 200);
 }
 
 async function searchComicVineByIssueNumber(seriesTitle, issueNumber, env) {
@@ -323,25 +317,9 @@ async function searchByIsbn(isbn) {
     title: book.title + (book.subtitle ? ": " + book.subtitle : ""),
     seriesName: book.title,
     image: "https://covers.openlibrary.org/b/isbn/" + encodeURIComponent(isbn) + "-M.jpg",
-    meta: "Comic/Manga" + (book.publish_date ? " · " + book.publish_date : "")
+    meta: "Book" + (book.publish_date ? " · " + book.publish_date : "")
   };
   return json({ items: [item] }, 200);
-}
-
-async function searchJikanItems(title) {
-  const upstream = await fetchWithTimeout(
-    "https://api.jikan.moe/v4/manga?q=" + encodeURIComponent(title) + "&limit=6"
-  );
-  const data = await upstream.json();
-
-  return (data.data || []).map(function (m) {
-    return {
-      title: m.title + (m.published && m.published.string ? " (" + m.published.string + ")" : ""),
-      seriesName: m.title,
-      image: (m.images && m.images.jpg && m.images.jpg.image_url) || "",
-      meta: "Manga"
-    };
-  });
 }
 
 function json(data, status) {

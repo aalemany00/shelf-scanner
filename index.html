@@ -21,7 +21,8 @@
   <nav class="categories" id="categoryTabs">
     <button class="cat-tab active" data-cat="game">Games</button>
     <button class="cat-tab" data-cat="figure">Figures</button>
-    <button class="cat-tab" data-cat="comic">Comics &amp; Manga</button>
+    <button class="cat-tab" data-cat="comic">Comics</button>
+    <button class="cat-tab" data-cat="book">Books &amp; Manga</button>
     <button class="cat-tab" data-cat="movie">Movies</button>
   </nav>
 
@@ -101,9 +102,9 @@
     <section class="collection">
       <h2 id="collectionTitle">Games</h2>
 
-      <!-- Comics/manga only: which status to browse. An item can be in more
-           than one (e.g. Have + Read), so these aren't mutually exclusive
-           filters so much as three different shelves. -->
+      <!-- Comics and Books & Manga only: which status to browse. An item can
+           be in more than one (e.g. Have + Read), so these aren't mutually
+           exclusive filters so much as three different shelves. -->
       <div id="comicStatusTabs" class="status-tabs hidden">
         <button type="button" class="status-tab active" data-status="have">Have It</button>
         <button type="button" class="status-tab" data-status="want">Want It</button>
@@ -131,12 +132,13 @@
       <p id="itemNotes"></p>
       <div class="form-actions">
         <button id="deleteItemBtn" class="btn danger">Remove</button>
+        <button id="moveItemBtn" class="btn hidden">Move</button>
         <button id="closeItemBtn" class="btn">Close</button>
       </div>
     </div>
   </div>
 
-  <!-- Comics/manga only: the collection grid groups owned items by series;
+  <!-- Comics/Books & Manga only: the collection grid groups owned items by series;
        this lists the individual owned issues/volumes within one series. -->
   <div id="seriesOverlay" class="overlay hidden">
     <div class="overlay-card series-card">
