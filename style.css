@@ -457,7 +457,7 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
 
 .shelf-item {
   flex: none;
-  width: 64px;
+  width: 92px;
   touch-action: none;
   position: relative;
   cursor: pointer;
@@ -469,7 +469,7 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
 }
 
 .shelf-cover {
-  height: 100px;
+  height: 142px;
   border: 2.5px solid var(--ink);
   border-right-width: 1.25px;
   border-left-width: 1.25px;
@@ -486,10 +486,10 @@ main { padding: 0 1rem; max-width: 720px; margin: 0 auto; }
 }
 
 .shelf-plank {
-  height: 14px;
+  height: 18px;
   background: #8B5A2B;
-  border-top: 3px solid #5C3A1E;
-  border-bottom: 4px solid #3E2714;
+  border-top: 4px solid #5C3A1E;
+  border-bottom: 5px solid #3E2714;
   background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0 2px, transparent 2px 15px);
 }
 

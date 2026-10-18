@@ -640,7 +640,7 @@
   // there's rarely more than a copy or two of the same book, so there's no
   // need to collapse into series tiles. Order within a section is a plain
   // user-set sequence (item.sortIndex), draggable via bindShelfDrag.
-  var SHELF_ITEM_WIDTH = 64;
+  var SHELF_ITEM_WIDTH = 92; // keep in sync with .shelf-item's width in style.css
 
   function renderBookShelf(container, items) {
     var sections = [
