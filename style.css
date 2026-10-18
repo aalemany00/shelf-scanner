@@ -54,9 +54,10 @@ body {
 
 .categories {
   display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.85rem 1rem;
-  overflow-x: auto;
 }
 
 .cat-tab {

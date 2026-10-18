@@ -235,23 +235,62 @@ async function searchComicVineByIssueNumber(seriesTitle, issueNumber, env) {
   return results.flat().map(cvItem);
 }
 
+var CV_ISSUES_FIELDS = "name,image,volume,issue_number,cover_date";
+var CV_ISSUES_PAGE_CAP = 500; // long-running volumes (Batman 1940: 700+) stop here
+
+function cvIssuesPageUrl(volumeId, env, offset) {
+  return "https://comicvine.gamespot.com/api/issues/?api_key=" + env.COMICVINE_API_KEY +
+    "&format=json&filter=volume:" + encodeURIComponent(volumeId) +
+    "&limit=100&offset=" + offset +
+    "&field_list=" + CV_ISSUES_FIELDS;
+}
+
 async function listComicVineIssues(volumeId, env) {
   if (!env.COMICVINE_API_KEY) {
     return json({ error: "ComicVine key not configured yet." }, 501);
   }
 
-  const upstream = await fetchWithTimeout(
-    "https://comicvine.gamespot.com/api/issues/?api_key=" + env.COMICVINE_API_KEY +
-      "&format=json&filter=volume:" + encodeURIComponent(volumeId) +
-      "&sort=cover_date:desc&limit=20" +
-      "&field_list=name,image,volume,issue_number,cover_date",
-    CV_HEADERS
-  );
-  const data = await upstream.json();
-  if (data.error && data.error !== "OK") {
-    return json({ error: "ComicVine: " + data.error }, 502);
+  const first = await (await fetchWithTimeout(cvIssuesPageUrl(volumeId, env, 0))).json();
+  if (first.error && first.error !== "OK") {
+    return json({ error: "ComicVine: " + first.error }, 502);
   }
-  return json({ items: (data.results || []).map(cvItem) }, 200);
+
+  var all = (first.results || []).slice();
+  var total = Math.min(first.number_of_total_results || all.length, CV_ISSUES_PAGE_CAP);
+
+  // A volume's issues come 100 at a time; fetch the rest in parallel so a
+  // long-running series (Batman 1940: 700+ issues) isn't silently cut off
+  // at the first page.
+  var extraOffsets = [];
+  for (var offset = 100; offset < total; offset += 100) extraOffsets.push(offset);
+
+  if (extraOffsets.length) {
+    var pages = await Promise.all(
+      extraOffsets.map(function (offset) {
+        return fetchWithTimeout(cvIssuesPageUrl(volumeId, env, offset))
+          .then(function (r) { return r.json(); })
+          .then(function (d) { return d.results || []; })
+          .catch(function () { return []; });
+      })
+    );
+    pages.forEach(function (page) { all = all.concat(page); });
+  }
+
+  // ComicVine's own sort treats issue_number as text ("1, 10, 11, 12, 2..."),
+  // not a number. Parse it ourselves; non-numeric issue numbers (annuals,
+  // specials) sort after the regular run instead of scattering randomly.
+  const results = all.sort(function (a, b) {
+    var an = parseFloat(a.issue_number);
+    var bn = parseFloat(b.issue_number);
+    var aValid = !isNaN(an);
+    var bValid = !isNaN(bn);
+    if (aValid && bValid) return an - bn;
+    if (aValid) return -1;
+    if (bValid) return 1;
+    return 0;
+  });
+
+  return json({ items: results.map(cvItem) }, 200);
 }
 
 async function searchJikanItems(title) {

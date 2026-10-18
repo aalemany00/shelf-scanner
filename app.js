@@ -11,7 +11,7 @@
   // League of Comic Geeks treats it) — no barcode lookup applies to comics
   // either way, so that category hides the Scan button entirely.
   var CATEGORIES = ["game", "figure", "comic", "movie"];
-  var CATEGORY_LABELS = { game: "Games", figure: "Figures", comic: "Comics", movie: "Movies" };
+  var CATEGORY_LABELS = { game: "Games", figure: "Figures", comic: "Comics & Manga", movie: "Movies" };
   var NO_SCAN = { comic: true };
   // Categories with a title-search API wired up in the Worker (worker/src/index.js).
   var SEARCH_KIND = { movie: "movie", game: "game", comic: "comic" };
