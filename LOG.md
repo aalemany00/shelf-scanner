@@ -308,3 +308,38 @@ regular books — searchable by scan, manual entry, or ISBN.
   Flagged to Adrian; not fixed as part of this change since it's a
   separate, pre-existing issue across every category, not specific to
   Books & Manga.
+
+## 2026-10-18 (fixed the add-item sync bug)
+
+**Planned:** Adrian asked to fix the sync bug found above.
+
+**Built:** two separate issues, not one — chasing the first exposed the
+second.
+
+- `app.js`'s sync listener replaced the entire local item list with
+  whatever Firestore last sent, with no regard for a write still in
+  flight from this same session — an add or delete that hadn't been
+  confirmed yet could get silently wiped or resurrected by a snapshot
+  that didn't reflect it. Added `pendingWrites`, a small in-memory map of
+  ids with adds/deletes still in flight, and a `reconcileWithPending`
+  step that merges each incoming snapshot against it: a pending add not
+  yet in the snapshot is kept, a pending delete still in the snapshot is
+  dropped. Clears once the write confirms either way, except a *failed*
+  add stays protected (there's no server copy to fall back on) while a
+  *failed* delete gets un-protected (the item still exists remotely).
+- Testing that fix immediately surfaced the real reason items were
+  disappearing: it wasn't actually a timing race at all. `firestore.rules`
+  only allowed documents with `category` in `["game", "figure", "comic",
+  "movie", "manga"]` — "book" wasn't on that list, so every write from
+  the new category was being rejected outright by the security rules,
+  every single time, not occasionally. Added "book" to the allowed list
+  (and dropped "manga," which the client hasn't written as a literal
+  category value since manga got folded into comics months ago) and
+  redeployed with `firebase deploy --only firestore:rules`.
+- Verified for real this time: added a book via ISBN search, confirmed
+  the status message no longer said "sync failed," reloaded the page
+  fully, and confirmed the item was still there — meaning it actually
+  reached Firestore, not just local storage. Also exercised the "Move to
+  Comics" button on it and then deleted it through the UI, reloading
+  again afterward to confirm the delete reached Firestore too and the
+  real collection was left clean.

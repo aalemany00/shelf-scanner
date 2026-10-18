@@ -39,6 +39,13 @@
     collectionSearch: "" // filters the currently-displayed grid, lowercased
   };
 
+  // Tracks Firestore writes still in flight: id -> "add" or "delete".
+  // addItem/delete update state.items and render immediately, then kick off
+  // the Firestore write asynchronously — a sync snapshot that lands before
+  // that write is reflected in it would otherwise silently wipe a just-added
+  // item (or resurrect a just-deleted one). See reconcileWithPending.
+  var pendingWrites = {};
+
   var el = {};
 
   document.addEventListener("DOMContentLoaded", init);
@@ -78,7 +85,7 @@
       .then(function () {
         sync.subscribe(function (remoteItems) {
           setSyncStatus("synced");
-          state.items = remoteItems;
+          state.items = reconcileWithPending(remoteItems);
           saveItems(); // keep the local cache warm for instant load next time
           renderGrid();
         });
@@ -86,6 +93,28 @@
       .catch(function () {
         setSyncStatus("sync error — working offline");
       });
+  }
+
+  // A snapshot is the server's view as of whenever it was fetched — it won't
+  // yet include a write still in flight from this same session. Keep any
+  // item whose add hasn't confirmed yet (it isn't in `remoteItems` because
+  // the write hasn't landed, not because it was deleted elsewhere), and drop
+  // any item whose delete hasn't confirmed yet (it's still in `remoteItems`
+  // only because the delete hasn't landed).
+  function reconcileWithPending(remoteItems) {
+    var byId = {};
+    remoteItems.forEach(function (it) { byId[it.id] = it; });
+
+    Object.keys(pendingWrites).forEach(function (id) {
+      if (pendingWrites[id] === "add" && !byId[id]) {
+        var local = findItemById(id);
+        if (local) byId[id] = local;
+      } else if (pendingWrites[id] === "delete") {
+        delete byId[id];
+      }
+    });
+
+    return Object.keys(byId).map(function (id) { return byId[id]; });
   }
 
   function setSyncStatus(text) {
@@ -256,7 +285,13 @@
       renderGrid();
 
       if (window.ShelfSync) {
-        window.ShelfSync.deleteItem(id).catch(function () {});
+        // On failure the delete never happened, so stop suppressing it —
+        // otherwise the next sync snapshot (which still has it) would get
+        // reconciled as if it were mid-deletion and hide it forever.
+        pendingWrites[id] = "delete";
+        window.ShelfSync.deleteItem(id)
+          .then(function () { delete pendingWrites[id]; })
+          .catch(function () { delete pendingWrites[id]; });
       }
     });
 
@@ -385,9 +420,16 @@
     setStatus("Added to your collection.");
 
     if (window.ShelfSync) {
-      window.ShelfSync.setItem(item).catch(function () {
-        setStatus("Added locally, but sync failed — will stay on this device for now.");
-      });
+      // Stays marked "add"-pending (not cleared) on failure: with no copy of
+      // this item in Firestore yet, clearing it here would let the very next
+      // sync snapshot wipe it right back out, contradicting the status
+      // message below.
+      pendingWrites[item.id] = "add";
+      window.ShelfSync.setItem(item)
+        .then(function () { delete pendingWrites[item.id]; })
+        .catch(function () {
+          setStatus("Added locally, but sync failed — will stay on this device for now.");
+        });
     }
   }
 
