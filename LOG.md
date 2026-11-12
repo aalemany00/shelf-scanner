@@ -458,3 +458,286 @@ top of the drag-and-drop order already there.
   correctly re-baselined to Custom and persisted through a full reload.
   Removed the one test entry (with a test author) afterward and confirmed
   the real shelf was untouched.
+
+## 2026-11-12 (retro collection-room redesign — Phase 1: layout/chrome)
+
+**Planned:** Adrian wasn't happy with Shelf Scanner's plain-grid look and had
+ChatGPT generate two mockups of an illustrated Japanese retro collector's-room
+redesign (wood shelves, a comic long-box, a lit figures cabinet, a cat
+mascot). Agreed on branch-and-phase discipline rather than one big rewrite.
+
+**Decided:**
+- New branch, `feature/retro-collection-room` — `main` stays untouched until
+  this is actually ready.
+- Decorative art (the illustrated textures/frames/mascot) has to come from an
+  image AI Adrian runs himself — I can't generate illustration. Wrote
+  `ASSET_LIST.md`: every decorative asset the mockups imply, broken into
+  individual transparent-PNG requests with ready-to-paste prompts, so
+  generating them doesn't turn into "screenshot the mockup and crop it."
+- Build in the mockup's own suggested phases, verifying each before the next:
+  Phase 1 (layout/chrome) first, real physical shelves/comic-box/cabinet
+  interactions later.
+
+**Built (Phase 1 — foundation, no real art assets yet):**
+- Restructured the page into a `.room` shell: a decorative marquee banner, a
+  header with a brand mark + mascot placeholder, a wood-textured sidebar
+  (category nav + Scan/Manual/ISBN buttons + a signage placeholder), and a
+  main content area with a yellow "ribbon" treatment on the collection title.
+- Every decorative piece is a CSS placeholder (`data-asset="name"` divs with
+  gradients/colors approximating the mockup's palette) — real PNGs from
+  `ASSET_LIST.md` can drop in later as `background-image` without touching
+  the HTML structure again.
+- New design tokens in `style.css` (`--wood`, `--wood-dark`, `--navy`,
+  `--cream-plate`) alongside the existing palette, plus a Noto Sans JP font
+  import for the Japanese text labels.
+- Deliberately did **not** move the scan/search/manual forms themselves —
+  only the three trigger buttons moved into the sidebar; the forms, preview,
+  and confirm panel stay in the main content area, since relocating them had
+  more regression risk than it was worth for a layout-only pass.
+
+**Verified:** confirmed every element app.js looks up is by `id`
+(`document.getElementById`), not DOM position, before moving anything — so
+reorganizing the containers couldn't break the JS. Ran it locally (desktop
+and mobile-width screenshots): category switching, Firestore sync pill,
+Have/Want/Read tabs, and the mobile nav reflow all still work; the
+comics-category "no scan button" behavior (existing `NO_SCAN` rule) still
+correctly hides Scan Barcode on that tab, matching behavior from before this
+change, not a regression.
+
+**Open items:**
+- No real art assets yet — Adrian to generate the `ASSET_LIST.md` batch.
+- Phase 2 (physical manga/book shelves with real spine rendering) not
+  started.
+- Phase 3 (comics long-box hover/drag interaction) not started — the most
+  complex remaining piece.
+
+## 2026-11-12 (retro redesign — Phase 2: real art + physical spine shelves)
+
+**Planned:** Adrian generated 10 assets with an image AI and supplied them,
+with specific direction: follow the generated images' own structure rather
+than Phase 1's abstract CSS layout; for Games/Movies/Books & Manga, show
+items as spines (not covers) that pop forward on click instead of resizing
+the shelf to fit everything; overflow should scroll horizontally, not wrap;
+for Comics, use real cover art in the hover-box interaction, not placeholders.
+He also asked which approach is better for Figures: a generic clickable
+placeholder figure, or compositing his real figures' photos into the cabinet.
+
+**Found, before building:** two of the ten generated assets
+(`reference-comicbox-baked.png`, `reference-figures-cabinet-baked.png`) have
+specific illustrated content (generic comics/figures) baked permanently into
+the artwork itself — they're not empty frames. That conflicts with holding a
+real, variable-sized collection: a fixed image can't gain a 7th figure if
+Adrian owns 7. Flagged rather than silently worked around; both need either
+a regenerated *empty* version (frame/interior only) or a different approach.
+Comics/Figures stayed on their pre-redesign grid for this pass as a result.
+
+**Recommended (not yet built):** for Figures, use Adrian's own real photos on
+individual bases inside an (empty, regenerated) cabinet frame, not generic
+placeholder figures — a personal collection app showing someone else's
+figures doesn't read as "your display pieces," and a baked-in generic set
+can't grow with the real collection anyway.
+
+**Built:**
+- Saved all 10 generated assets into `assets/` (converted from `.webp` to
+  `.png` after finding some failed to decode in-browser as delivered —
+  re-encoding through Pillow fixed it; root cause never fully diagnosed, but
+  not worth chasing further since the fix is clean and cheap).
+- Wired in the straightforward assets as real `<img>`/background-image
+  elements: header banner, logo wordmark, cat mascot, the Scan Barcode /
+  Enter Manually button plates (their English+Japanese labels are baked into
+  the art — safe, since that copy never changes), and the Famicom sidebar
+  poster. Removed the Phase 1 CSS approximations these replace.
+- Built a shared "physical shelf" system (`SPINE_SHELF_CONFIG`,
+  `renderShelfCategory`, `buildSpineScrollRow`, `buildSpineTile` in `app.js`)
+  used by Games, Movies, and Books & Manga:
+  - Each item renders as a generated spine (colored + vertical title text,
+    deterministic from a hash of the title — not the cover rotated sideways,
+    per the original brief's "dynamic spine renderer" requirement) sized
+    24–39px wide.
+  - Click pops the spine forward to show the real cover at full size; click
+    the popped-forward cover again opens the existing item-details modal.
+    Clicking anywhere else on the page collapses it. Keyboard-operable
+    (Enter/Space to pop forward, Escape to collapse, Tab-focusable).
+  - A fixed-size shelf no longer wraps to more rows or resizes as the
+    collection grows — items that don't fit scroll horizontally in their own
+    row, with ‹/› buttons.
+  - `shelf-manga-movies.png` is used as a sprite for both Books & Manga and
+    Movies (its top half / bottom half respectively, via
+    `background-position`) — one generated image serving two categories,
+    since the mockup only drew the two shelf types together once.
+  - Removed the old book-only `renderBookShelf`/`buildShelfTile`
+    cover-grid code this replaces; kept the existing drag-to-reorder,
+    Have/Want/Read filter, and alphabetical/date/author sort — none of that
+    changed, just what a shelf item looks like at rest.
+- Games and Movies didn't have shelf rendering before this (they were a
+  plain cover grid) — this is new for them, not a style swap.
+
+**Fixed along the way:** found Python's `http.server` (used for quick local
+testing) truncates large file downloads under this browser's concurrent
+asset requests — same root cause already documented in Upkeep's `CLAUDE.md`
+("single-request-at-a-time handling causes real connection resets"). Added
+the same fix: a `dev-server.js` Node static server
+(`shelf-scanner-static` in the shared root `.claude/launch.json`, port 8040).
+Not an app bug, but cost real debugging time before the pattern was
+recognized — worth remembering for any future artifact that serves large
+images.
+
+**Verified:** desktop-width screenshots of Games/Books & Manga/Movies
+showing real art + real spines + working scroll buttons; clicked a game
+spine through both click stages (pop forward → open details modal,
+confirmed via `itemOverlay`'s hidden-class state, not just visually);
+confirmed Firestore sync, category switching, and Have/Want/Read filtering
+all still work; no console errors.
+
+**Open items:**
+- Figures decision still open (Adrian to confirm which approach).
+- Comics long-box and Figures cabinet both blocked on regenerated *empty*
+  art (see "Found, before building" above) — not started this pass.
+- The generated PNGs are large (1–2.8MB each even after resizing to 1400px
+  max dimension and PNG-optimizing) — fine for now, but worth converting to
+  WebP with a real quality/size budget before this ships for real mobile use.
+- `.sidebar-sign` ("The Collection Room") is still the Phase 1 CSS
+  placeholder — no matching asset was generated for it.
+
+## 2026-11-12 (retro redesign — pivot: dropped AI art, CSS/SVG shop front)
+
+**Planned:** Adrian looked at the Phase 2 build (real AI-generated art + spine
+shelves) and said plainly it didn't look like what he asked for — a big dead
+gap under the banner, plain white form boxes dominating the page next to one
+nice-looking shelf. He then had ChatGPT build a second, *independent*
+single-file HTML/CSS prototype of the same concept and said it was "closer,"
+though not polished either. That prototype builds the entire retro shop
+look in pure CSS + inline SVG — no generated raster images anywhere.
+
+**Decided:** adopt the prototype's technique wholesale rather than patch the
+image-based approach further. Root cause of Phase 2's problems: AI-generated
+PNGs were inconsistent to art-direct (two decoded as blank in-browser until
+re-encoded through Pillow; one — the header banner — had ~90% transparent
+padding around a thin visible strip, which is what caused the dead-gap
+complaint) and two of them baked in fixed content that couldn't hold a real
+collection. Pure CSS/SVG sidesteps all of that: no decode failures, no
+padding surprises, nothing baked in, and it's what actually looked right to
+Adrian. The AI-generated PNGs from the previous pass stay in `assets/` but
+are no longer referenced by any file — not deleted, in case any of them are
+useful later (e.g. the Famicom poster style), but the live page depends on
+none of them now.
+
+**Built (full chrome rebuild, index.html + style.css + app.js):**
+- A real shop-front masthead: roofline, lit shop windows, a mountain-and-sun
+  hero illustration, the "SHELF SCANNER" wordmark done in CSS (text-stroke +
+  layered text-shadow, no image), a hanging "THE COLLECTION ROOM" sign, a
+  paper lantern, and a waving cat mascot — all CSS gradients/clip-paths plus
+  one inline SVG for the mascot (adapted from the prototype's own inline SVG,
+  not derived from Adrian's earlier generated art).
+- Sidebar rebuilt to match: a wood-framed nav list, Scan/Manual buttons as
+  CSS-only embossed plates (no image dependency at all now — this also
+  permanently resolves the plate-button CSS-specificity bug from Phase 2),
+  and a small decorative "city poster" panel (pure CSS mountain/sun via
+  clip-path + gradient).
+- Every category now sits inside one `.display-section` "display case" with
+  a ribbon-style department title (CSS `clip-path`, bilingual label) and a
+  wood-plank footer — replacing the old plain `.collection-ribbon` and the
+  gap-prone banner.
+- Forms (scan/search/manual/confirm) restyled onto a parchment panel instead
+  of plain white boxes — same functionality, no structural changes, so
+  nothing about the actual add/edit flow changed.
+- **Figures** got real content for the first time: a lit glass display case
+  (`renderFiguresCase` in `app.js`) showing Adrian's actual figure photos on
+  individual bases, replacing the old plain grid.
+- **Comics got the real long-box interaction** (`renderComicBox`,
+  `renderComicCards`, `shiftComic` in `app.js`) — the piece blocked since the
+  original asset-based attempt. Real cover images (not placeholders), fanned
+  out with the nearest-to-pointer card rising forward; arrow keys, mouse
+  wheel, and touch swipe all shift the selection; Enter or a click opens the
+  real item-details modal. Shows every owned issue flattened across series
+  (not grouped), per Adrian's explicit ask — a deliberate change from the
+  pre-redesign behavior, which grouped by series. A sliding 5-card window
+  keeps it readable regardless of collection size. The old series-grouped
+  grid (`renderSeriesGroupedGrid`) and its `seriesOverlay` modal are still in
+  the codebase but now unreachable — cleanup candidate, not removed this pass
+  to limit risk.
+- Spines (Games/Movies/Books & Manga) switched from the real-art shelf
+  backdrop to a plain wood-plank-and-shadow treatment, same generated-color
+  spine mechanic as before (unchanged — that part was never the complaint).
+
+**Verified:**
+- Tested with 3 real test comics added through the actual manual-entry form
+  (not injected test data) — confirmed the box renders them, hover-to-select
+  and click-to-open both work against real Firestore-backed items, then
+  deleted all 3 through the app's own Remove flow afterward (confirmed 0
+  remain, both in `localStorage` and by extension Firestore, since deletion
+  goes through the normal `ShelfSync.deleteItem` path) — this account is
+  shared with Adrian's real collection via Firebase anonymous auth, so test
+  data was never left behind.
+- Confirmed the figures case renders a real item image from the real
+  collection, not a placeholder.
+- No console errors other than expected network failures (the Cloudflare
+  Worker and RAWG-style lookups aren't reachable from this sandboxed
+  browser — unrelated to the redesign).
+- Desktop-width screenshots confirm Games/Books & Manga/Movies all render
+  correctly end to end, department-title through wood-plank footer.
+
+**Tooling note:** this session's browser-preview tool's screenshot stopped
+reflecting the page's scrolled position partway through testing (DOM
+measurements via `getBoundingClientRect` kept confirming elements were in
+the visible viewport, but screenshots kept showing stale/unscrolled content)
+— worked around by verifying the Comics/Figures interactions via direct DOM
+state checks instead of pixel comparison. Not an app bug; just a quirk of
+this particular verification session worth remembering if it recurs.
+
+**Open items:**
+- `renderSeriesGroupedGrid`/`seriesOverlay` are dead code now — remove them,
+  or reintroduce series grouping as an optional view inside the long-box,
+  once Adrian confirms flattened-by-issue is really what he wants long-term.
+- The AI-generated PNGs in `assets/` are unused by the live page — ask
+  Adrian whether to delete them or keep for possible future use before
+  cleaning up the repo.
+- Mobile-width layout not re-verified after this rebuild (verified in the
+  Phase 2 pass, but the chrome changed substantially since).
+
+## 2026-11-12 (real spine art — crop tool)
+
+**Planned:** Adrian wants to use real scanned box art for spines instead of
+the generated colored bar, sourced from sites like thecoverproject.net.
+Checked that site first: it's behind a Cloudflare bot challenge, so no
+automated lookup is possible (confirmed via a plain fetch, not by trying to
+get around the challenge — that's out of bounds). Its own cover scans come
+as one "full-wrap" image (back cover | spine | front cover side by side),
+not a separate spine file, so a plain "paste a spine image URL" field
+wouldn't actually be usable with real scans. Decided against hotlinking
+that site's images directly even if copied by hand (the download link is a
+script on the same protected domain, unlikely to load reliably as a
+hotlink for anyone without a solved challenge) — Adrian downloads the
+image himself and hosts it somewhere he controls.
+
+**Built:** an in-app crop tool (`SPINE_ART.md` has the full writeup) — paste
+a full-wrap scan's URL in the add/edit form, two range sliders mark where
+the spine sits (% of the image's width), with a live preview (highlight
+over the full image + the actual cropped shelf-spine result). Saved as
+three optional fields per item (`spineImage`, `spineCropStart`,
+`spineCropEnd`) alongside the existing `image` (front cover) field — fully
+additive, nothing about the existing cover/add/edit flow changed for items
+that don't use it.
+
+The crop itself (`applyImageCrop` in `app.js`) is pure CSS positioning
+derived from the image's natural width/height — horizontal-only crop (full
+height preserved, no stretching), recomputed live wherever it's shown
+(the form's live preview and the real shelf tile share the same function).
+No server-side processing, no stored cropped copy. A broken `spineImage`
+URL falls back to the generated spine automatically.
+
+**Verified:** tested end-to-end with a local test image (external image
+hosts are blocked in this sandbox, so a real thecoverproject.net URL
+couldn't be used for the test — confirmed the crop math against the image's
+actual known dimensions instead, which checked out exactly). Added one test
+item with spine art through the real form, confirmed the shelf tile
+rendered the real crop (not the generated bar) at the mathematically
+correct width, confirmed click-to-expand and click-to-open-details still
+work on a real-spine tile, then deleted the test item.
+
+**Open items:**
+- Figures and Comics don't have an equivalent "real art" option yet (they
+  already use real cover/figure photos directly, so there's no generated
+  stand-in to replace there).
+- No drag-to-reorder on the two range sliders beyond the native `<input
+  type="range">` — fine for now, not a touch-optimized crop gesture.

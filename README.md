@@ -23,8 +23,13 @@ there even though it won't over plain `http://` on your phone.
 
 ## Status
 
-Layer 1 in progress: scan/lookup/manual-entry/local grid all work per
-category. Not yet done: Firebase sync across devices, ComicVine lookup for
-comics/manga, the visual bookshelf and comic-box UI (Layer 2).
+Shipped and live. Scan/lookup/manual-entry, Firebase sync across devices,
+category-specific lookups (OMDb/RAWG/ComicVine/Open Library via the
+Cloudflare Worker in `worker/`), and Have/Want/Read shelves with sorting all
+work.
+
+Now in progress: a full visual redesign into an illustrated Japanese retro
+collection-room look, on branch `feature/retro-collection-room` — see
+`CLAUDE.md` and `ASSET_LIST.md`.
 
 See `LOG.md` for the plans/changes log.

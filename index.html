@@ -4,145 +4,241 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Shelf Scanner</title>
-  <meta name="theme-color" content="#C8102E">
+  <meta name="theme-color" content="#b72e28">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <h1>Shelf Scanner</h1>
-    <span id="syncStatus" class="pill">local only</span>
-  </header>
-
-  <nav class="categories" id="categoryTabs">
-    <button class="cat-tab active" data-cat="game">Games</button>
-    <button class="cat-tab" data-cat="figure">Figures</button>
-    <button class="cat-tab" data-cat="comic">Comics</button>
-    <button class="cat-tab" data-cat="book">Books &amp; Manga</button>
-    <button class="cat-tab" data-cat="movie">Movies</button>
-  </nav>
-
-  <p id="attribution" class="attribution hidden">
-    Game data from <a href="https://rawg.io" target="_blank" rel="noopener">RAWG.io</a>
-  </p>
-
-  <main>
-    <section class="add-panel">
-      <div class="add-actions">
-        <button id="scanBtn" class="btn primary">Scan Barcode</button>
-        <button id="typeBtn" class="btn">Enter Manually</button>
-        <button id="isbnBtn" class="btn hidden">Search by ISBN</button>
+  <div class="page-grain" aria-hidden="true"></div>
+  <div class="site">
+    <header class="masthead">
+      <div class="roofline" aria-hidden="true"></div>
+      <div class="shop-windows" aria-hidden="true">
+        <div class="window-pane"></div><div class="window-pane"></div>
+        <div class="window-pane"></div><div class="window-pane"></div>
       </div>
-      <p class="scan-hint">Zoom in so the barcode fills most of the frame — decoding needs the bars to be large.</p>
-
-      <!-- capture="environment" opens the phone's native camera to take a
-           single photo, which we decode client-side. Live in-page video
-           scanning hits an unresolved WebKit bug on iOS Safari where the
-           decode loop never fires even though the preview renders. -->
-      <input type="file" id="scanInput" accept="image/*" capture="environment" class="hidden">
-      <div id="scanPreviewWrap" class="scanner-wrap hidden">
-        <img id="scanPreview" alt="Captured barcode photo">
+      <div class="hero-art" aria-hidden="true">
+        <div class="sun"></div>
+        <svg viewBox="0 0 420 112" preserveAspectRatio="none">
+          <path d="M0 100 L75 58 L120 76 L187 0 L229 42 L264 24 L327 86 L420 57 L420 112 L0 112Z" fill="#e4d3b6"/>
+          <path d="M142 43 L187 0 L227 39 L208 32 L194 48 L179 33 L164 51Z" fill="#f9f0df"/>
+          <path d="M0 108 L84 79 L144 98 L219 55 L274 82 L346 64 L420 90 L420 112 L0 112Z" fill="#567079"/>
+        </svg>
       </div>
-
-      <form id="searchForm" class="manual-form hidden">
-        <input type="text" id="searchTitleInput" placeholder="Title" autocomplete="off">
-        <div class="form-actions">
-          <button type="submit" class="btn primary">Search</button>
-          <button type="button" id="cancelSearchBtn" class="btn">Cancel</button>
+      <div class="hero-brand">
+        <span class="hero-kicker jp">シェルフスキャナー ・ 昭和レトロ・コレクション</span>
+        <h1>SHELF<span>SCANNER</span><i>収集</i></h1>
+        <p><b>YOUR PERSONAL COLLECTION LIBRARY</b> <span class="jp">・ 自分だけの小さな宝物屋</span></p>
+      </div>
+      <div class="mast-right">
+        <div class="hanging-board">
+          <small class="jp">コレクションの部屋</small>
+          <strong>THE COLLECTION ROOM</strong>
+          <span id="syncStatus">local only</span>
         </div>
-        <button type="button" id="searchToManualBtn" class="link-btn">Can't find it? Enter it manually instead</button>
-      </form>
+        <div class="lantern" aria-hidden="true">収<br>集</div>
+        <svg class="mascot" viewBox="0 0 175 215" aria-hidden="true">
+          <defs><linearGradient id="catg" x2="0" y2="1"><stop stop-color="#fdf5d9"/><stop offset="1" stop-color="#f4c786"/></linearGradient></defs>
+          <path d="M32 58 L34 22 L62 37 Q86 23 112 37 L140 18 L143 65" fill="url(#catg)" stroke="#322a30" stroke-width="5" stroke-linejoin="round"/>
+          <ellipse cx="91" cy="87" rx="63" ry="59" fill="url(#catg)" stroke="#322a30" stroke-width="5"/>
+          <path d="M47 45 L67 33 L83 54 L57 70Z M105 53 L128 32 L137 65 L116 71Z" fill="#bf6f51"/>
+          <path d="M64 89 Q74 82 82 92 M106 91 Q116 82 126 89" stroke="#342831" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M88 103 L101 103 L95 111Z" fill="#d97e81"/>
+          <path d="M95 111 Q81 121 75 113 M95 111 Q107 122 113 111" stroke="#48313c" stroke-width="3" fill="none"/>
+          <path d="M45 105 L13 101 M46 116 L11 122 M133 104 L160 98 M135 116 L164 124" stroke="#54434b" stroke-width="2"/>
+          <path d="M48 125 Q25 149 43 187 Q91 211 130 186 Q145 153 128 125" fill="#f6e2ba" stroke="#322a30" stroke-width="5"/>
+          <circle cx="90" cy="163" r="15" fill="#e8c05d" stroke="#5d4140" stroke-width="4"/>
+          <path d="M82 165 H98 M90 157 V171" stroke="#6a4144" stroke-width="3"/>
+        </svg>
+      </div>
+    </header>
 
-      <form id="isbnForm" class="manual-form hidden">
-        <input type="text" id="isbnInput" placeholder="ISBN (the barcode on the back cover)" autocomplete="off" inputmode="numeric">
-        <div class="form-actions">
-          <button type="submit" class="btn primary">Search</button>
-          <button type="button" id="cancelIsbnBtn" class="btn">Cancel</button>
+    <div class="site-body">
+      <aside class="sidebar">
+        <nav class="side-menu" id="categoryTabs" aria-label="Collection categories">
+          <button class="cat-tab active" data-cat="game"><span class="nav-icon">🎮</span><span>Games</span><b>›</b></button>
+          <button class="cat-tab" data-cat="figure"><span class="nav-icon">♟</span><span>Figures</span><b>›</b></button>
+          <button class="cat-tab" data-cat="comic"><span class="nav-icon">▤</span><span>Comics</span><b>›</b></button>
+          <button class="cat-tab" data-cat="book"><span class="nav-icon">▥</span><span>Books &amp; Manga</span><b>›</b></button>
+          <button class="cat-tab" data-cat="movie"><span class="nav-icon">▣</span><span>Movies</span><b>›</b></button>
+        </nav>
+
+        <div class="side-divider">★ ★ ★</div>
+
+        <button id="scanBtn" class="scan-panel">
+          <span class="scanner-mark">▥</span>
+          <span><strong>SCAN BARCODE</strong><small class="jp">バーコードをスキャン</small></span>
+        </button>
+        <button id="typeBtn" class="manual-panel">
+          <span class="plus-mark">✚</span>
+          <span><strong>ENTER MANUALLY</strong><small class="jp">手動で追加</small></span>
+        </button>
+        <button id="isbnBtn" class="manual-panel hidden">
+          <span class="plus-mark">#</span>
+          <span><strong>SEARCH BY ISBN</strong></span>
+        </button>
+
+        <div class="city-poster" aria-hidden="true">
+          <div class="poster-sun"></div>
+          <div class="poster-mountain"></div>
+          <span class="jp">コレクターの街</span>
+          <strong>YOUR TINY<br>COLLECTION<br>PARADISE!</strong>
+          <div class="city-silhouette">▥ ▥ ▥ ▦ ▤ ▥</div>
         </div>
-        <button type="button" id="isbnToManualBtn" class="link-btn">Can't find it? Enter it manually instead</button>
-      </form>
+      </aside>
 
-      <div id="searchResults" class="search-results hidden"></div>
-
-      <form id="manualForm" class="manual-form hidden">
-        <input type="text" id="titleInput" placeholder="Title" autocomplete="off">
-        <p id="manualDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
-        <div id="manualSubKindRow" class="subkind-row hidden">
-          <button type="button" class="subkind-chip" data-subkind="book">Book</button>
-          <button type="button" class="subkind-chip" data-subkind="manga">Manga</button>
-        </div>
-        <input type="text" id="authorInput" class="hidden" placeholder="Author (optional)" autocomplete="off">
-        <input type="text" id="imageInput" placeholder="Cover image URL (optional)" autocomplete="off">
-        <input type="text" id="notesInput" placeholder="Notes (optional)" autocomplete="off">
-        <div class="form-actions">
-          <button type="submit" id="manualSubmitBtn" class="btn primary">Add to Collection</button>
-          <button type="button" id="cancelManualBtn" class="btn">Cancel</button>
-        </div>
-      </form>
-
-      <div id="confirmPanel" class="confirm-panel hidden">
-        <img id="confirmImage" alt="">
-        <div class="confirm-info">
-          <h3 id="confirmTitle"></h3>
-          <p id="confirmMeta"></p>
-          <p id="confirmDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
-          <div id="confirmSubKindRow" class="subkind-row hidden">
-            <button type="button" class="subkind-chip" data-subkind="book">Book</button>
-            <button type="button" class="subkind-chip" data-subkind="manga">Manga</button>
+      <main class="workspace">
+        <section class="display-section" id="displaySection">
+          <div class="department-title">
+            <span class="department-icon" id="deptIcon">✦</span>
+            <strong class="jp" id="collectionTitleJp">ゲーム</strong>
+            <b id="collectionTitle">Games</b>
           </div>
-          <div id="confirmStatusRow" class="status-row hidden">
-            <button type="button" class="status-chip" data-status="have">Have It</button>
-            <button type="button" class="status-chip" data-status="want">Want It</button>
-            <button type="button" class="status-chip" data-status="read">Read It</button>
+
+          <p id="attribution" class="attribution hidden">
+            Game data from <a href="https://rawg.io" target="_blank" rel="noopener">RAWG.io</a>
+          </p>
+
+          <div class="add-panel">
+            <p class="scan-hint">Zoom in so the barcode fills most of the frame — decoding needs the bars to be large.</p>
+
+            <!-- capture="environment" opens the phone's native camera to take a
+                 single photo, which we decode client-side. Live in-page video
+                 scanning hits an unresolved WebKit bug on iOS Safari where the
+                 decode loop never fires even though the preview renders. -->
+            <input type="file" id="scanInput" accept="image/*" capture="environment" class="hidden">
+            <div id="scanPreviewWrap" class="scanner-wrap hidden">
+              <img id="scanPreview" alt="Captured barcode photo">
+            </div>
+
+            <form id="searchForm" class="manual-form hidden">
+              <input type="text" id="searchTitleInput" placeholder="Title" autocomplete="off">
+              <div class="form-actions">
+                <button type="submit" class="btn primary">Search</button>
+                <button type="button" id="cancelSearchBtn" class="btn">Cancel</button>
+              </div>
+              <button type="button" id="searchToManualBtn" class="link-btn">Can't find it? Enter it manually instead</button>
+            </form>
+
+            <form id="isbnForm" class="manual-form hidden">
+              <input type="text" id="isbnInput" placeholder="ISBN (the barcode on the back cover)" autocomplete="off" inputmode="numeric">
+              <div class="form-actions">
+                <button type="submit" class="btn primary">Search</button>
+                <button type="button" id="cancelIsbnBtn" class="btn">Cancel</button>
+              </div>
+              <button type="button" id="isbnToManualBtn" class="link-btn">Can't find it? Enter it manually instead</button>
+            </form>
+
+            <div id="searchResults" class="search-results hidden"></div>
+
+            <form id="manualForm" class="manual-form hidden">
+              <input type="text" id="titleInput" placeholder="Title" autocomplete="off">
+              <p id="manualDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
+              <div id="manualSubKindRow" class="subkind-row hidden">
+                <button type="button" class="subkind-chip" data-subkind="book">Book</button>
+                <button type="button" class="subkind-chip" data-subkind="manga">Manga</button>
+              </div>
+              <input type="text" id="authorInput" class="hidden" placeholder="Author (optional)" autocomplete="off">
+              <input type="text" id="imageInput" placeholder="Cover image URL (optional)" autocomplete="off">
+
+              <!-- Optional: a real spine, cropped out of a full-wrap cover
+                   scan (back | spine | front), instead of the generated
+                   colored-bar spine. See SPINE_ART.md. -->
+              <button type="button" id="spineArtToggle" class="link-btn">+ Add real spine art (optional)</button>
+              <div id="spineArtPanel" class="spine-art-panel hidden">
+                <input type="text" id="spineImageInput" placeholder="Full cover scan URL (back | spine | front)" autocomplete="off">
+                <div id="spineCropPreviewWrap" class="spine-crop-preview hidden">
+                  <img id="spineCropPreviewImg" alt="">
+                  <div class="spine-crop-mask" id="spineCropMaskLeft"></div>
+                  <div class="spine-crop-mask" id="spineCropMaskRight"></div>
+                </div>
+                <div id="spineCropControls" class="spine-crop-controls hidden">
+                  <label>Spine starts at <input type="range" id="spineCropStartInput" min="0" max="100" value="44" step="1"><span id="spineCropStartLabel">44%</span></label>
+                  <label>Spine ends at <input type="range" id="spineCropEndInput" min="0" max="100" value="50" step="1"><span id="spineCropEndLabel">50%</span></label>
+                </div>
+                <div id="spineLivePreviewRow" class="spine-live-preview-row hidden">
+                  <span>Shelf preview:</span>
+                  <div class="spine-live-preview-slot"><div id="spineLivePreview" class="spine-real-crop"></div></div>
+                  <button type="button" id="spineArtClearBtn" class="link-btn">Remove spine art</button>
+                </div>
+              </div>
+
+              <input type="text" id="notesInput" placeholder="Notes (optional)" autocomplete="off">
+              <div class="form-actions">
+                <button type="submit" id="manualSubmitBtn" class="btn primary">Add to Collection</button>
+                <button type="button" id="cancelManualBtn" class="btn">Cancel</button>
+              </div>
+            </form>
+
+            <div id="confirmPanel" class="confirm-panel hidden">
+              <img id="confirmImage" alt="">
+              <div class="confirm-info">
+                <h3 id="confirmTitle"></h3>
+                <p id="confirmMeta"></p>
+                <p id="confirmDuplicateWarning" class="duplicate-warning hidden">You already have this in your collection.</p>
+                <div id="confirmSubKindRow" class="subkind-row hidden">
+                  <button type="button" class="subkind-chip" data-subkind="book">Book</button>
+                  <button type="button" class="subkind-chip" data-subkind="manga">Manga</button>
+                </div>
+                <div id="confirmStatusRow" class="status-row hidden">
+                  <button type="button" class="status-chip" data-status="have">Have It</button>
+                  <button type="button" class="status-chip" data-status="want">Want It</button>
+                  <button type="button" class="status-chip" data-status="read">Read It</button>
+                </div>
+                <div class="form-actions">
+                  <button id="confirmAddBtn" class="btn primary">Add to Collection</button>
+                  <button id="confirmEditBtn" class="btn">Edit</button>
+                  <button id="confirmCancelBtn" class="btn">Cancel</button>
+                </div>
+              </div>
+            </div>
+
+            <p id="statusMsg" class="status-msg"></p>
           </div>
-          <div class="form-actions">
-            <button id="confirmAddBtn" class="btn primary">Add to Collection</button>
-            <button id="confirmEditBtn" class="btn">Edit</button>
-            <button id="confirmCancelBtn" class="btn">Cancel</button>
+
+          <!-- Comics and Books & Manga only: which status to browse. An item can
+               be in more than one (e.g. Have + Read), so these aren't mutually
+               exclusive filters so much as three different shelves. -->
+          <div id="comicStatusTabs" class="status-tabs hidden">
+            <button type="button" class="status-tab active" data-status="have">Have It</button>
+            <button type="button" class="status-tab" data-status="want">Want It</button>
+            <button type="button" class="status-tab" data-status="read">Read It</button>
           </div>
-        </div>
-      </div>
 
-      <p id="statusMsg" class="status-msg"></p>
-    </section>
+          <!-- Books & Manga shelf only: how to order each shelf. "Custom" is the
+               drag-to-reorder order (see bindShelfDrag in app.js); dragging while
+               a different sort is active adopts the order on screen as the new
+               custom order and switches back to it. -->
+          <div id="bookSortRow" class="sort-row hidden">
+            <select id="bookSortMethod" class="sort-select" aria-label="Sort shelf by">
+              <option value="custom">Custom order</option>
+              <option value="alpha">Alphabetical</option>
+              <option value="added">Date added</option>
+              <option value="author">Author</option>
+            </select>
+            <button type="button" id="bookSortDirectionBtn" class="btn" aria-label="Sort ascending">&uarr;</button>
+          </div>
 
-    <section class="collection">
-      <h2 id="collectionTitle">Games</h2>
+          <input type="text" id="collectionSearchInput" class="collection-search" placeholder="Search your collection...">
 
-      <!-- Comics and Books & Manga only: which status to browse. An item can
-           be in more than one (e.g. Have + Read), so these aren't mutually
-           exclusive filters so much as three different shelves. -->
-      <div id="comicStatusTabs" class="status-tabs hidden">
-        <button type="button" class="status-tab active" data-status="have">Have It</button>
-        <button type="button" class="status-tab" data-status="want">Want It</button>
-        <button type="button" class="status-tab" data-status="read">Read It</button>
-      </div>
+          <div id="grid" class="grid"></div>
+          <p id="emptyMsg" class="empty-msg hidden">Nothing here yet — scan or add your first item.</p>
+          <p id="noMatchMsg" class="empty-msg hidden">No matches for your search.</p>
 
-      <!-- Books & Manga shelf only: how to order each shelf. "Custom" is the
-           drag-to-reorder order (see bindShelfDrag in app.js); dragging while
-           a different sort is active adopts the order on screen as the new
-           custom order and switches back to it. -->
-      <div id="bookSortRow" class="sort-row hidden">
-        <select id="bookSortMethod" class="sort-select" aria-label="Sort shelf by">
-          <option value="custom">Custom order</option>
-          <option value="alpha">Alphabetical</option>
-          <option value="added">Date added</option>
-          <option value="author">Author</option>
-        </select>
-        <button type="button" id="bookSortDirectionBtn" class="btn" aria-label="Sort ascending">&uarr;</button>
-      </div>
+          <div class="wood-plank"><span>★ • • ★</span></div>
+        </section>
+      </main>
+    </div>
 
-      <input type="text" id="collectionSearchInput" class="collection-search" placeholder="Search your collection...">
-
-      <div id="grid" class="grid"></div>
-      <p id="emptyMsg" class="empty-msg hidden">Nothing here yet — scan or add your first item.</p>
-      <p id="noMatchMsg" class="empty-msg hidden">No matches for your search.</p>
-    </section>
-  </main>
+    <div class="bottom-plank">
+      <span class="jp">棚の記録 • COLLECTION ROOM</span>
+      <span>✧ &nbsp; YOUR COLLECTION, YOUR STORY &nbsp; ✧</span>
+    </div>
+  </div>
 
   <div id="itemOverlay" class="overlay hidden">
     <div class="overlay-card">
