@@ -145,20 +145,74 @@
               <input type="text" id="authorInput" class="hidden" placeholder="Author (optional)" autocomplete="off">
               <input type="text" id="imageInput" placeholder="Cover image URL (optional)" autocomplete="off">
 
+              <!-- Upload a cover scan (e.g. a full-wrap back|spine|front
+                   scan) and crop just the front-cover portion out of it.
+                   Crops client-side (so cross-origin images never taint
+                   the canvas) and uploads only the cropped result — unlike
+                   the spine tool below, this doesn't store the crop
+                   separately, item.image just becomes the cropped file. -->
+              <button type="button" id="coverUploadToggle" class="link-btn">+ Upload &amp; crop a cover image</button>
+              <div id="coverCropPanel" class="spine-art-panel hidden">
+                <label class="btn spine-upload-btn">
+                  Choose an image to crop
+                  <input type="file" id="coverUploadInput" accept="image/*" class="hidden">
+                </label>
+                <span id="coverUploadStatus" class="spine-upload-status"></span>
+                <div id="coverCropPreviewWrap" class="spine-crop-preview hidden">
+                  <img id="coverCropPreviewImg" alt="">
+                  <div class="spine-crop-mask" id="coverCropMaskLeft"></div>
+                  <div class="spine-crop-mask" id="coverCropMaskRight"></div>
+                </div>
+                <div id="coverCropControls" class="spine-crop-controls hidden">
+                  <label>Cover starts at
+                    <input type="range" id="coverCropStartInput" min="0" max="100" value="0" step="1">
+                    <input type="number" id="coverCropStartNumber" min="0" max="100" value="0" step="1" class="spine-crop-number"><span>px</span>
+                  </label>
+                  <label>Cover ends at
+                    <input type="range" id="coverCropEndInput" min="0" max="100" value="100" step="1">
+                    <input type="number" id="coverCropEndNumber" min="0" max="100" value="100" step="1" class="spine-crop-number"><span>px</span>
+                  </label>
+                  <p class="spine-crop-hint">On a full-wrap scan, skip past the back cover and spine so only the front cover is inside the range. Leave it covering the whole image if you're uploading a front-cover-only picture.</p>
+                  <div id="coverLivePreviewRow" class="spine-live-preview-row hidden">
+                    <span>Preview:</span>
+                    <div class="spine-live-preview-slot cover-live-preview-slot"><div id="coverLivePreview" class="spine-real-crop"></div></div>
+                  </div>
+                  <div class="form-actions">
+                    <button type="button" id="coverCropApplyBtn" class="btn primary">Use this crop</button>
+                    <button type="button" id="coverCropCancelBtn" class="btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Optional: a real spine, cropped out of a full-wrap cover
                    scan (back | spine | front), instead of the generated
                    colored-bar spine. See SPINE_ART.md. -->
               <button type="button" id="spineArtToggle" class="link-btn">+ Add real spine art (optional)</button>
               <div id="spineArtPanel" class="spine-art-panel hidden">
                 <input type="text" id="spineImageInput" placeholder="Full cover scan URL (back | spine | front)" autocomplete="off">
+                <div class="spine-upload-row">
+                  <span class="spine-upload-or">or</span>
+                  <label class="btn spine-upload-btn">
+                    Upload a file
+                    <input type="file" id="spineUploadInput" accept="image/*" class="hidden">
+                  </label>
+                  <span id="spineUploadStatus" class="spine-upload-status"></span>
+                </div>
                 <div id="spineCropPreviewWrap" class="spine-crop-preview hidden">
                   <img id="spineCropPreviewImg" alt="">
                   <div class="spine-crop-mask" id="spineCropMaskLeft"></div>
                   <div class="spine-crop-mask" id="spineCropMaskRight"></div>
                 </div>
                 <div id="spineCropControls" class="spine-crop-controls hidden">
-                  <label>Spine starts at <input type="range" id="spineCropStartInput" min="0" max="100" value="44" step="1"><span id="spineCropStartLabel">44%</span></label>
-                  <label>Spine ends at <input type="range" id="spineCropEndInput" min="0" max="100" value="50" step="1"><span id="spineCropEndLabel">50%</span></label>
+                  <label>Spine starts at
+                    <input type="range" id="spineCropStartInput" min="0" max="100" value="44" step="1">
+                    <input type="number" id="spineCropStartNumber" min="0" max="100" value="44" step="1" class="spine-crop-number"><span>px</span>
+                  </label>
+                  <label>Spine ends at
+                    <input type="range" id="spineCropEndInput" min="0" max="100" value="50" step="1">
+                    <input type="number" id="spineCropEndNumber" min="0" max="100" value="50" step="1" class="spine-crop-number"><span>px</span>
+                  </label>
+                  <p class="spine-crop-hint">Zoom into the image above (browser zoom, or open it in a new tab) to find the exact pixel where the spine starts/ends, then type it here — nudge with the arrow keys for ±1px.</p>
                 </div>
                 <div id="spineLivePreviewRow" class="spine-live-preview-row hidden">
                   <span>Shelf preview:</span>

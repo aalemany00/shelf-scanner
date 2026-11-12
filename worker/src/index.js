@@ -24,10 +24,18 @@
 //     for trade paperbacks). Google Books was tried first but its
 //     keyless/anonymous quota is exhausted globally — not fixable from our
 //     side — so this goes through Open Library instead.
+//   POST /upload (multipart, field "file") -> uploads to imgbb and returns
+//     { url }. Used for real spine art (see SPINE_ART.md): Firebase Storage
+//     would need the Blaze billing plan even for free-tier usage, which this
+//     project avoids. catbox.moe was tried first (no account needed at all)
+//     but started rejecting anonymous API uploads ("Invalid uploader") and
+//     its FAQ has odd language specifically about AI agents and a removal
+//     fee — switched to imgbb instead, same free-tier-with-a-key pattern as
+//     OMDb/RAWG/ComicVine above.
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type"
 };
 
@@ -39,6 +47,10 @@ export default {
 
     const url = new URL(request.url);
 
+    if (url.pathname === "/upload" && request.method === "POST") {
+      return handleUpload(request, env);
+    }
+
     if (url.pathname === "/search") {
       return handleSearch(url, env);
     }
@@ -46,6 +58,45 @@ export default {
     return handleUpcLookup(url);
   }
 };
+
+async function handleUpload(request, env) {
+  try {
+    if (!env.IMGBB_API_KEY) {
+      return json({ error: "Image host not configured yet." }, 501);
+    }
+
+    const incoming = await request.formData();
+    const file = incoming.get("file");
+    if (!file || typeof file === "string") {
+      return json({ error: "Missing file." }, 400);
+    }
+    if (!file.type || !file.type.startsWith("image/")) {
+      return json({ error: "Only image files are accepted." }, 400);
+    }
+    // imgbb's documented free-tier size limit; checked here so a bad upload
+    // fails fast with a clear message instead of a generic upstream error.
+    if (file.size > 32 * 1024 * 1024) {
+      return json({ error: "File is too large (imgbb's limit is 32MB)." }, 400);
+    }
+
+    const outgoing = new FormData();
+    outgoing.set("image", file, file.name || "upload");
+
+    const upstream = await fetchWithTimeout(
+      "https://api.imgbb.com/1/upload?key=" + env.IMGBB_API_KEY,
+      { method: "POST", body: outgoing }
+    );
+    const data = await upstream.json();
+
+    if (!upstream.ok || !data.success || !data.data || !data.data.url) {
+      const message = (data.error && data.error.message) || "unknown error";
+      return json({ error: "imgbb rejected the upload: " + message }, 502);
+    }
+    return json({ url: data.data.url }, 200);
+  } catch (err) {
+    return json({ error: "Upload failed — try again." }, 503);
+  }
+}
 
 async function handleUpcLookup(url) {
   const upc = url.searchParams.get("upc") || "";
