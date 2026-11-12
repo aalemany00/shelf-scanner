@@ -159,11 +159,30 @@
     el.spineCropControls = document.getElementById("spineCropControls");
     el.spineCropStartInput = document.getElementById("spineCropStartInput");
     el.spineCropEndInput = document.getElementById("spineCropEndInput");
-    el.spineCropStartLabel = document.getElementById("spineCropStartLabel");
-    el.spineCropEndLabel = document.getElementById("spineCropEndLabel");
+    el.spineCropStartNumber = document.getElementById("spineCropStartNumber");
+    el.spineCropEndNumber = document.getElementById("spineCropEndNumber");
     el.spineLivePreviewRow = document.getElementById("spineLivePreviewRow");
     el.spineLivePreview = document.getElementById("spineLivePreview");
     el.spineArtClearBtn = document.getElementById("spineArtClearBtn");
+    el.spineUploadInput = document.getElementById("spineUploadInput");
+    el.spineUploadStatus = document.getElementById("spineUploadStatus");
+    el.coverUploadToggle = document.getElementById("coverUploadToggle");
+    el.coverCropPanel = document.getElementById("coverCropPanel");
+    el.coverUploadInput = document.getElementById("coverUploadInput");
+    el.coverUploadStatus = document.getElementById("coverUploadStatus");
+    el.coverCropPreviewWrap = document.getElementById("coverCropPreviewWrap");
+    el.coverCropPreviewImg = document.getElementById("coverCropPreviewImg");
+    el.coverCropMaskLeft = document.getElementById("coverCropMaskLeft");
+    el.coverCropMaskRight = document.getElementById("coverCropMaskRight");
+    el.coverCropControls = document.getElementById("coverCropControls");
+    el.coverCropStartInput = document.getElementById("coverCropStartInput");
+    el.coverCropEndInput = document.getElementById("coverCropEndInput");
+    el.coverCropStartNumber = document.getElementById("coverCropStartNumber");
+    el.coverCropEndNumber = document.getElementById("coverCropEndNumber");
+    el.coverLivePreviewRow = document.getElementById("coverLivePreviewRow");
+    el.coverLivePreview = document.getElementById("coverLivePreview");
+    el.coverCropApplyBtn = document.getElementById("coverCropApplyBtn");
+    el.coverCropCancelBtn = document.getElementById("coverCropCancelBtn");
     el.notesInput = document.getElementById("notesInput");
     el.manualDuplicateWarning = document.getElementById("manualDuplicateWarning");
     el.manualSubKindRow = document.getElementById("manualSubKindRow");
@@ -263,6 +282,7 @@
     });
     bindSubKindRow(el.manualSubKindRow);
     bindSpineArtPanel();
+    bindCoverCropPanel();
     el.cancelManualBtn.addEventListener("click", hideManualForm);
     el.manualForm.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -850,16 +870,34 @@
       item.spineCropEnd > item.spineCropStart;
   }
 
-  // Crops imgEl to just the [startPct, endPct] horizontal slice of its own
-  // natural width, at full natural height scaled to targetHeightPx — i.e.
-  // the real proportions of that slice, no stretching. containerEl must be
-  // position:relative/overflow:hidden; imgEl must be position:absolute
-  // (both set here). Needs the image already loaded (naturalWidth/Height).
-  function applyImageCrop(naturalWidth, naturalHeight, startPct, endPct, containerEl, imgEl, targetHeightPx) {
-    var sliceWidthPct = endPct - startPct;
-    if (sliceWidthPct <= 0 || !naturalWidth || !naturalHeight) return;
-    var renderedFullWidth = targetHeightPx * (naturalWidth / naturalHeight);
-    var sliceWidthPx = renderedFullWidth * (sliceWidthPct / 100);
+  // One-time migration: spineCropStart/End used to be percentages (0-100)
+  // before this switched to exact source pixels (percent steps were too
+  // coarse to land on a real spine's seam, see LOG.md). A real cover scan
+  // is always far wider than 100px, so "both values ≤ 100" is a safe
+  // signal that an item predates the switch — convert it in place, once,
+  // and persist so this doesn't re-check every render.
+  function migrateLegacyPercentSpineCrop(item, naturalWidth) {
+    if (!naturalWidth || item.spineCropStart > 100 || item.spineCropEnd > 100) return;
+    item.spineCropStart = Math.round(item.spineCropStart / 100 * naturalWidth);
+    item.spineCropEnd = Math.round(item.spineCropEnd / 100 * naturalWidth);
+    saveItems();
+    if (window.ShelfSync) window.ShelfSync.setItem(item).catch(function () {});
+  }
+
+  // Crops imgEl to just the [startPx, endPx] horizontal slice of its own
+  // natural width (exact source pixels, not a percentage — a spine is
+  // often only ~5% of the full image's width, so whole-percent steps were
+  // too coarse to land on the real seam; this gives single-pixel
+  // precision instead), at full natural height scaled to targetHeightPx —
+  // i.e. the real proportions of that slice, no stretching. containerEl
+  // must be position:relative/overflow:hidden; imgEl must be
+  // position:absolute (both set here). Needs the image already loaded
+  // (naturalWidth/Height).
+  function applyImageCrop(naturalWidth, naturalHeight, startPx, endPx, containerEl, imgEl, targetHeightPx) {
+    if (endPx <= startPx || !naturalWidth || !naturalHeight) return;
+    var scale = targetHeightPx / naturalHeight;
+    var renderedFullWidth = naturalWidth * scale;
+    var sliceWidthPx = (endPx - startPx) * scale;
 
     containerEl.style.position = "relative";
     containerEl.style.overflow = "hidden";
@@ -871,7 +909,7 @@
     imgEl.style.height = targetHeightPx + "px";
     imgEl.style.width = renderedFullWidth + "px";
     imgEl.style.maxWidth = "none";
-    imgEl.style.left = -(startPct / 100 * renderedFullWidth) + "px";
+    imgEl.style.left = -(startPx * scale) + "px";
 
     return sliceWidthPx;
   }
@@ -897,6 +935,7 @@
       cropWrap.appendChild(cropImg);
       tile.appendChild(cropWrap);
       cropImg.addEventListener("load", function () {
+        migrateLegacyPercentSpineCrop(item, cropImg.naturalWidth);
         var w = applyImageCrop(cropImg.naturalWidth, cropImg.naturalHeight, item.spineCropStart, item.spineCropEnd, cropWrap, cropImg, SPINE_HEIGHT_PX);
         if (w) tile.style.width = w + "px";
       });
@@ -1373,6 +1412,7 @@
     el.manualSubmitBtn.textContent = "Add to Collection";
     state.editingId = null;
     populateSpineArtPanel(null);
+    resetCoverCropPanel();
   }
 
   // ---------- real spine art (crop a full-wrap scan, see SPINE_ART.md) ----------
@@ -1384,12 +1424,52 @@
       el.spineArtPanel.classList.toggle("hidden");
     });
     el.spineImageInput.addEventListener("change", loadSpineCropImage);
-    el.spineCropStartInput.addEventListener("input", onSpineCropInputChange);
-    el.spineCropEndInput.addEventListener("input", onSpineCropInputChange);
+    el.spineCropStartInput.addEventListener("input", onSpineCropRangeChange);
+    el.spineCropEndInput.addEventListener("input", onSpineCropRangeChange);
+    el.spineCropStartNumber.addEventListener("input", onSpineCropNumberChange);
+    el.spineCropEndNumber.addEventListener("input", onSpineCropNumberChange);
     el.spineArtClearBtn.addEventListener("click", function () {
       el.spineImageInput.value = "";
       resetSpineArtPreview();
     });
+    el.spineUploadInput.addEventListener("change", uploadSpineArtFile);
+  }
+
+  // Uploads a file/blob to imgbb via the Worker (see SPINE_ART.md for why
+  // imgbb and not Firebase Storage/catbox) and resolves to the hosted URL.
+  // Shared by the spine-art upload button and the cover crop-and-upload
+  // flow below.
+  function uploadBlobToWorker(blob, filename) {
+    var formData = new FormData();
+    formData.set("file", blob, filename);
+    return fetch(LOOKUP_PROXY_URL + "/upload", { method: "POST", body: formData })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) throw new Error(data.error);
+        return data.url;
+      });
+  }
+
+  // Uploads the chosen file as-is (no crop — that's the cover-art flow
+  // below) and fills the URL field with the result, then runs the normal
+  // load-and-crop flow as if that URL had been pasted in.
+  function uploadSpineArtFile() {
+    var file = el.spineUploadInput.files[0];
+    if (!file) return;
+
+    el.spineUploadStatus.textContent = "Uploading…";
+    uploadBlobToWorker(file, file.name)
+      .then(function (url) {
+        el.spineImageInput.value = url;
+        el.spineUploadStatus.textContent = "Uploaded.";
+        loadSpineCropImage();
+      })
+      .catch(function (err) {
+        el.spineUploadStatus.textContent = "Upload failed: " + err.message;
+      })
+      .finally(function () {
+        el.spineUploadInput.value = "";
+      });
   }
 
   function loadSpineCropImage() {
@@ -1408,6 +1488,21 @@
       img.alt = "";
       img.src = url;
       el.spineLivePreview.appendChild(img);
+
+      // Crop range is in real source pixels now, not a percentage — a
+      // spine is often only ~5% of the image's width, so whole-percent
+      // steps were too coarse to land on the real seam. Re-anchor the
+      // 0-100 default (44/50) onto this image's actual width the first
+      // time it loads, so there's still a sane starting guess.
+      [el.spineCropStartInput, el.spineCropEndInput, el.spineCropStartNumber, el.spineCropEndNumber].forEach(function (input) {
+        input.max = probe.naturalWidth;
+      });
+      if (Number(el.spineCropEndInput.max) === 100 || !el.spineCropStartInput.dataset.isPixels) {
+        el.spineCropStartInput.value = Math.round(probe.naturalWidth * 0.44);
+        el.spineCropEndInput.value = Math.round(probe.naturalWidth * 0.50);
+      }
+      el.spineCropStartInput.dataset.isPixels = "1";
+      syncSpineCropNumbers();
       updateSpineCropUI();
     };
     probe.onerror = function () {
@@ -1417,32 +1512,52 @@
     probe.src = url;
   }
 
-  function onSpineCropInputChange() {
+  function onSpineCropRangeChange() {
+    syncSpineCropNumbers();
+    enforceSpineCropOrder(document.activeElement === el.spineCropStartInput);
+    updateSpineCropUI();
+  }
+
+  function onSpineCropNumberChange() {
+    el.spineCropStartInput.value = el.spineCropStartNumber.value;
+    el.spineCropEndInput.value = el.spineCropEndNumber.value;
+    enforceSpineCropOrder(document.activeElement === el.spineCropStartNumber);
+    syncSpineCropNumbers();
+    updateSpineCropUI();
+  }
+
+  function syncSpineCropNumbers() {
+    el.spineCropStartNumber.value = el.spineCropStartInput.value;
+    el.spineCropEndNumber.value = el.spineCropEndInput.value;
+  }
+
+  // Keeps a minimum 1px gap without fighting whichever handle the user is
+  // actually moving.
+  function enforceSpineCropOrder(movingStart) {
     var start = Number(el.spineCropStartInput.value);
     var end = Number(el.spineCropEndInput.value);
-    // Keep a minimum 1% gap without fighting whichever handle the user is
-    // actually dragging.
+    var max = Number(el.spineCropEndInput.max) || 100;
     if (end <= start) {
-      if (document.activeElement === el.spineCropStartInput) {
-        end = Math.min(100, start + 1);
+      if (movingStart) {
+        end = Math.min(max, start + 1);
         el.spineCropEndInput.value = end;
+        el.spineCropEndNumber.value = end;
       } else {
         start = Math.max(0, end - 1);
         el.spineCropStartInput.value = start;
+        el.spineCropStartNumber.value = start;
       }
     }
-    updateSpineCropUI();
   }
 
   function updateSpineCropUI() {
     var start = Number(el.spineCropStartInput.value);
     var end = Number(el.spineCropEndInput.value);
-    el.spineCropStartLabel.textContent = start + "%";
-    el.spineCropEndLabel.textContent = end + "%";
+    var width = spineCropNatural.width || Number(el.spineCropEndInput.max) || 1;
     el.spineCropMaskLeft.style.left = "0";
-    el.spineCropMaskLeft.style.width = start + "%";
-    el.spineCropMaskRight.style.left = end + "%";
-    el.spineCropMaskRight.style.width = (100 - end) + "%";
+    el.spineCropMaskLeft.style.width = (start / width * 100) + "%";
+    el.spineCropMaskRight.style.left = (end / width * 100) + "%";
+    el.spineCropMaskRight.style.width = (100 - end / width * 100) + "%";
 
     var img = el.spineLivePreview.querySelector("img");
     if (img && spineCropNatural.width && spineCropNatural.height) {
@@ -1457,6 +1572,8 @@
     el.spineCropControls.classList.add("hidden");
     el.spineLivePreviewRow.classList.add("hidden");
     el.spineLivePreview.innerHTML = "";
+    el.spineUploadStatus.textContent = "";
+    delete el.spineCropStartInput.dataset.isPixels;
   }
 
   // Shows/hides and fills the panel when opening the form for an existing
@@ -1467,12 +1584,11 @@
       el.spineImageInput.value = item.spineImage;
       el.spineCropStartInput.value = item.spineCropStart;
       el.spineCropEndInput.value = item.spineCropEnd;
+      el.spineCropStartInput.dataset.isPixels = "1"; // don't re-guess 44/50% once loaded
       loadSpineCropImage();
     } else {
       el.spineArtPanel.classList.add("hidden");
       el.spineImageInput.value = "";
-      el.spineCropStartInput.value = 44;
-      el.spineCropEndInput.value = 50;
       resetSpineArtPreview();
     }
   }
@@ -1484,6 +1600,171 @@
     var end = Number(el.spineCropEndInput.value);
     if (!(end > start)) return null;
     return { spineImage: url, spineCropStart: start, spineCropEnd: end };
+  }
+
+  // ---------- cover art: upload & crop ----------
+  // Unlike the spine tool above (which keeps the full source image and
+  // crops it live every render), this crops once, client-side, and
+  // uploads only the cropped result — item.image stays a plain already-
+  // cropped URL, so every existing place that already shows it (grid
+  // tiles, the confirm panel, the item overlay, the figures case) needs
+  // no changes. Cropping happens on a local object URL (the file the user
+  // just picked), never on a fetched remote URL, so the canvas is never
+  // cross-origin-tainted — this is why it's an upload-only flow, not a
+  // "paste a URL" one like the spine tool.
+
+  var coverCropState = { naturalWidth: 0, naturalHeight: 0, objectUrl: null };
+
+  function bindCoverCropPanel() {
+    el.coverUploadToggle.addEventListener("click", function () {
+      el.coverCropPanel.classList.toggle("hidden");
+    });
+    el.coverUploadInput.addEventListener("change", onCoverFilePicked);
+    el.coverCropStartInput.addEventListener("input", onCoverCropRangeChange);
+    el.coverCropEndInput.addEventListener("input", onCoverCropRangeChange);
+    el.coverCropStartNumber.addEventListener("input", onCoverCropNumberChange);
+    el.coverCropEndNumber.addEventListener("input", onCoverCropNumberChange);
+    el.coverCropApplyBtn.addEventListener("click", applyCoverCrop);
+    el.coverCropCancelBtn.addEventListener("click", resetCoverCropPanel);
+  }
+
+  function onCoverFilePicked() {
+    var file = el.coverUploadInput.files[0];
+    if (!file) return;
+    if (coverCropState.objectUrl) URL.revokeObjectURL(coverCropState.objectUrl);
+    var objectUrl = URL.createObjectURL(file);
+    coverCropState.objectUrl = objectUrl;
+
+    var probe = new Image();
+    probe.onload = function () {
+      coverCropState.naturalWidth = probe.naturalWidth;
+      coverCropState.naturalHeight = probe.naturalHeight;
+
+      el.coverCropPreviewImg.src = objectUrl;
+      el.coverCropPreviewWrap.classList.remove("hidden");
+      el.coverCropControls.classList.remove("hidden");
+      el.coverLivePreviewRow.classList.remove("hidden");
+      el.coverLivePreview.innerHTML = "";
+      var preview = document.createElement("img");
+      preview.alt = "";
+      preview.src = objectUrl;
+      el.coverLivePreview.appendChild(preview);
+
+      [el.coverCropStartInput, el.coverCropEndInput, el.coverCropStartNumber, el.coverCropEndNumber].forEach(function (input) {
+        input.max = probe.naturalWidth;
+      });
+      // Default to the full image (no crop) — most uploads here will
+      // already be a plain front cover, not a full-wrap scan, so "no
+      // crop" should be the zero-effort default, not a guessed slice.
+      el.coverCropStartInput.value = 0;
+      el.coverCropEndInput.value = probe.naturalWidth;
+      syncCoverCropNumbers();
+      updateCoverCropUI();
+    };
+    probe.onerror = function () {
+      el.coverUploadStatus.textContent = "Couldn't read that file.";
+    };
+    probe.src = objectUrl;
+  }
+
+  function onCoverCropRangeChange() {
+    syncCoverCropNumbers();
+    enforceCoverCropOrder(document.activeElement === el.coverCropStartInput);
+    updateCoverCropUI();
+  }
+
+  function onCoverCropNumberChange() {
+    el.coverCropStartInput.value = el.coverCropStartNumber.value;
+    el.coverCropEndInput.value = el.coverCropEndNumber.value;
+    enforceCoverCropOrder(document.activeElement === el.coverCropStartNumber);
+    syncCoverCropNumbers();
+    updateCoverCropUI();
+  }
+
+  function syncCoverCropNumbers() {
+    el.coverCropStartNumber.value = el.coverCropStartInput.value;
+    el.coverCropEndNumber.value = el.coverCropEndInput.value;
+  }
+
+  function enforceCoverCropOrder(movingStart) {
+    var start = Number(el.coverCropStartInput.value);
+    var end = Number(el.coverCropEndInput.value);
+    var max = Number(el.coverCropEndInput.max) || 100;
+    if (end <= start) {
+      if (movingStart) {
+        end = Math.min(max, start + 1);
+        el.coverCropEndInput.value = end;
+        el.coverCropEndNumber.value = end;
+      } else {
+        start = Math.max(0, end - 1);
+        el.coverCropStartInput.value = start;
+        el.coverCropStartNumber.value = start;
+      }
+    }
+  }
+
+  function updateCoverCropUI() {
+    var start = Number(el.coverCropStartInput.value);
+    var end = Number(el.coverCropEndInput.value);
+    var width = coverCropState.naturalWidth || Number(el.coverCropEndInput.max) || 1;
+    el.coverCropMaskLeft.style.left = "0";
+    el.coverCropMaskLeft.style.width = (start / width * 100) + "%";
+    el.coverCropMaskRight.style.left = (end / width * 100) + "%";
+    el.coverCropMaskRight.style.width = (100 - end / width * 100) + "%";
+
+    var img = el.coverLivePreview.querySelector("img");
+    if (img && coverCropState.naturalWidth && coverCropState.naturalHeight) {
+      applyImageCrop(coverCropState.naturalWidth, coverCropState.naturalHeight, start, end, el.coverLivePreview, img, 170);
+    }
+  }
+
+  function resetCoverCropPanel() {
+    if (coverCropState.objectUrl) URL.revokeObjectURL(coverCropState.objectUrl);
+    coverCropState = { naturalWidth: 0, naturalHeight: 0, objectUrl: null };
+    el.coverUploadInput.value = "";
+    el.coverUploadStatus.textContent = "";
+    el.coverCropPreviewWrap.classList.add("hidden");
+    el.coverCropControls.classList.add("hidden");
+    el.coverLivePreviewRow.classList.add("hidden");
+    el.coverLivePreview.innerHTML = "";
+    el.coverCropPanel.classList.add("hidden");
+  }
+
+  // Draws just the [start, end] horizontal slice (full height, the same
+  // crop shape as the spine tool) onto an offscreen canvas at native
+  // resolution, uploads that as a new file, and fills the Cover image URL
+  // field with the result.
+  function applyCoverCrop() {
+    var start = Number(el.coverCropStartInput.value);
+    var end = Number(el.coverCropEndInput.value);
+    if (!(end > start) || !coverCropState.naturalHeight) return;
+
+    var canvas = document.createElement("canvas");
+    canvas.width = end - start;
+    canvas.height = coverCropState.naturalHeight;
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(
+      el.coverCropPreviewImg,
+      start, 0, end - start, coverCropState.naturalHeight,
+      0, 0, end - start, coverCropState.naturalHeight
+    );
+
+    el.coverUploadStatus.textContent = "Uploading…";
+    canvas.toBlob(function (blob) {
+      if (!blob) {
+        el.coverUploadStatus.textContent = "Couldn't process that image.";
+        return;
+      }
+      uploadBlobToWorker(blob, "cover.jpg")
+        .then(function (url) {
+          el.imageInput.value = url;
+          el.coverUploadStatus.textContent = "Uploaded.";
+          resetCoverCropPanel();
+        })
+        .catch(function (err) {
+          el.coverUploadStatus.textContent = "Upload failed: " + err.message;
+        });
+    }, "image/jpeg", 0.92);
   }
 
   // ---------- title search ----------

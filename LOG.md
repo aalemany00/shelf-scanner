@@ -741,3 +741,118 @@ work on a real-spine tile, then deleted the test item.
   stand-in to replace there).
 - No drag-to-reorder on the two range sliders beyond the native `<input
   type="range">` — fine for now, not a touch-optimized crop gesture.
+
+## 2026-11-12 (spine art, continued: hosting, upload, precision fix)
+
+**Planned:** Adrian didn't want cover-art images committed into the repo
+after all — asked for "a database" instead. Firebase Storage (the obvious
+fit, same project as the Firestore sync already in place) turns out to
+require the Blaze billing plan even for free-tier usage as of a Sept 2024
+Firebase policy change — ruled out, same "no paid services" line held
+everywhere else in this project. Landed on an in-app upload button that
+proxies through the existing Worker to a free image host, same pattern as
+the OMDb/RAWG/ComicVine lookups already there.
+
+**Built:**
+- `POST /upload` in `worker/src/index.js`: accepts a multipart file,
+  forwards it to an image host, returns `{ url }`.
+- A file-upload button in the spine-art panel (`app.js`'s
+  `uploadSpineArtFile`) that calls it and auto-fills the URL field.
+
+**Hit and fixed along the way:**
+- First tried catbox.moe (no account needed at all). Its API started
+  rejecting anonymous uploads ("Invalid uploader") on the live Cloudflare
+  edge (a local-only `wrangler dev` test earlier had already failed
+  differently — "Network connection lost" — apparently a quirk of the local
+  Workers emulator in this environment, not a real signal either way). Its
+  FAQ also has language specifically about AI agents and a $5-per-file
+  removal fee, which reads as either an aggressive real policy or something
+  aimed at manipulating agents into backing off — flagged to Adrian rather
+  than either ignoring it or treating it as a real instruction, and switched
+  to imgbb instead of digging further into whichever it is.
+- imgbb needs its own free API key, set as a Worker secret
+  (`IMGBB_API_KEY`) the same way OMDb/RAWG/ComicVine keys already are.
+  Confirmed working end-to-end against the real deployed Worker (not just
+  locally) with a real upload.
+- Getting `wrangler` itself usable took a few rounds, all environment
+  issues unrelated to this app's code: PowerShell's execution policy blocks
+  `.ps1` scripts (fixed with the `.cmd` variants of `npm`/`npx`), then a TLS
+  certificate verification error on this network for both `npm` and
+  wrangler's own OAuth call (fixed with `NODE_OPTIONS=--use-system-ca`).
+  Also flagged and declined a `developers.cloudflare.com/agent-setup`
+  prompt.md Adrian pointed at — it covers an unrelated Cloudflare MCP/`cf`
+  CLI setup, not `wrangler`, and explicitly tells an agent to install global
+  packages and edit user config files without asking first, so it was read
+  and reported on but not followed.
+
+**Found and fixed, after Adrian tested with a real cover scan:** the crop
+sliders only moved in whole-percent steps, but a spine is often only ~5% of
+a full-wrap scan's width — a single 1% step was a large fraction of the
+spine's own width, making it impossible to land on the real seam exactly
+("it still features some of the back and front cover," per Adrian). Fixed
+by switching `spineCropStart`/`spineCropEnd` from percentages to **exact
+source pixels** of the image's natural width, with paired number inputs
+(arrow-key nudgeable, ±1px) next to each slider — see `SPINE_ART.md`.
+
+**Caught by testing, not just assumed fixed:** this unit change silently
+broke Adrian's one pre-existing real item that already had spine art set
+up under the old percentage system (re-interpreting its old 47/53 *percent*
+values as 47px/53px produced a near-invisible sliver). Added
+`migrateLegacyPercentSpineCrop` — converts any item whose stored crop
+values are both ≤100 (a real cover scan is never that narrow, so this is a
+safe "this predates the unit switch" signal) to real pixels the first time
+it renders, then persists the fix so it only happens once. Verified via the
+browser console that the real item's values actually updated (47/53 →
+1499/1691 against its real 3190px-wide cover) and the tile rendered at the
+mathematically correct width afterward.
+
+**Open items:**
+- `.sidebar-sign` CSS placeholder and the dead `renderSeriesGroupedGrid`/
+  `seriesOverlay` code from the redesign pass are both still outstanding
+  cleanup, unrelated to this entry.
+
+## 2026-11-12 (cover image: an upload-and-crop tool, separate from spine art)
+
+**Planned:** Adrian pointed out the front cover was showing cut off on the
+left in the item overlay. Root cause: he'd been pasting the same full-wrap
+scan into the plain "Cover image URL" field (the only option available),
+which `object-fit: cover` then center-crops to fit the cover box — mostly
+showing spine/back-cover content, barely any of the actual front cover.
+Asked for the same kind of upload-and-crop option on the cover field.
+
+**Built:** a second crop tool, deliberately built differently from the
+spine one rather than reusing it as-is:
+- **Upload-only, no pasted-URL option.** Cropping happens via `<canvas>`,
+  and a cross-origin image drawn to canvas without the right CORS headers
+  taints it and blocks reading the cropped result back out. A file picked
+  from disk has no such restriction, so this flow never fetches a remote
+  URL for cropping — only ever a local file the user just chose.
+- **Crops once, uploads only the result**, unlike the spine tool's
+  "keep the source, crop it live every render" approach — `item.image`
+  ends up a plain, already-cropped URL, so every other place that already
+  renders it (grid tiles, confirm panel, item overlay, figures case) needed
+  zero changes.
+- Same horizontal-slice crop shape/math as the spine tool (reused
+  `applyImageCrop` directly), defaulting to the whole image (no crop) —
+  most uploads here will already be a plain front cover, not a full-wrap
+  scan, so "no crop" is the right zero-effort default.
+- Refactored the spine upload's "send a file to the Worker, get a URL back"
+  logic into a shared `uploadBlobToWorker` helper used by both tools.
+
+**Verified:** built a synthetic (non-copyrighted) three-color test image —
+a red/white/green block standing in for back cover/spine/front cover — to
+check the crop pixel-exactly without needing a real cover scan for testing.
+Ran the full flow through the real app (pick file → set crop range via the
+number inputs → "Use this crop" → real upload to imgbb), downloaded the
+actual resulting hosted image, and confirmed it was exactly 440×500 (the
+requested pixel range) and pure green corner-to-corner — zero bleed from
+the adjacent "back cover" color. Confirmed the saved item's `image` field
+pointed at that cropped URL, then deleted the test item and the local
+synthetic test file afterward.
+
+**Open items:**
+- An actual file named `playstation_4.attackontitanwingsoffreedom_US....jpg`
+  is still sitting in `assets/` from before this upload tool existed (when
+  Adrian was manually dropping files in) — now redundant since cover/spine
+  art goes through imgbb instead. Left it for Adrian to delete himself
+  since he put it there.
