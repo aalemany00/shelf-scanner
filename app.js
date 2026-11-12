@@ -13,6 +13,8 @@
   // comic issues either way, so that category hides the Scan button.
   var CATEGORIES = ["game", "figure", "comic", "book", "movie"];
   var CATEGORY_LABELS = { game: "Games", figure: "Figures", comic: "Comics", book: "Books & Manga", movie: "Movies" };
+  var CATEGORY_JP = { game: "ゲーム", figure: "フィギュア", comic: "コミック", book: "漫画・書籍", movie: "映画・TV" };
+  var CATEGORY_ICON = { game: "✣", figure: "♙", comic: "▤", book: "♧", movie: "▣" };
   var NO_SCAN = { comic: true };
   // Printed books/manga carry a real ISBN-13 barcode on the back cover —
   // scanning it goes straight through the ISBN lookup (see onScanSuccess),
@@ -147,6 +149,21 @@
     el.titleInput = document.getElementById("titleInput");
     el.authorInput = document.getElementById("authorInput");
     el.imageInput = document.getElementById("imageInput");
+    el.spineArtToggle = document.getElementById("spineArtToggle");
+    el.spineArtPanel = document.getElementById("spineArtPanel");
+    el.spineImageInput = document.getElementById("spineImageInput");
+    el.spineCropPreviewWrap = document.getElementById("spineCropPreviewWrap");
+    el.spineCropPreviewImg = document.getElementById("spineCropPreviewImg");
+    el.spineCropMaskLeft = document.getElementById("spineCropMaskLeft");
+    el.spineCropMaskRight = document.getElementById("spineCropMaskRight");
+    el.spineCropControls = document.getElementById("spineCropControls");
+    el.spineCropStartInput = document.getElementById("spineCropStartInput");
+    el.spineCropEndInput = document.getElementById("spineCropEndInput");
+    el.spineCropStartLabel = document.getElementById("spineCropStartLabel");
+    el.spineCropEndLabel = document.getElementById("spineCropEndLabel");
+    el.spineLivePreviewRow = document.getElementById("spineLivePreviewRow");
+    el.spineLivePreview = document.getElementById("spineLivePreview");
+    el.spineArtClearBtn = document.getElementById("spineArtClearBtn");
     el.notesInput = document.getElementById("notesInput");
     el.manualDuplicateWarning = document.getElementById("manualDuplicateWarning");
     el.manualSubKindRow = document.getElementById("manualSubKindRow");
@@ -164,6 +181,8 @@
     el.confirmCancelBtn = document.getElementById("confirmCancelBtn");
     el.statusMsg = document.getElementById("statusMsg");
     el.collectionTitle = document.getElementById("collectionTitle");
+    el.collectionTitleJp = document.getElementById("collectionTitleJp");
+    el.deptIcon = document.getElementById("deptIcon");
     el.comicStatusTabs = document.getElementById("comicStatusTabs");
     el.bookSortRow = document.getElementById("bookSortRow");
     el.bookSortMethod = document.getElementById("bookSortMethod");
@@ -243,6 +262,7 @@
       el.manualDuplicateWarning.classList.toggle("hidden", !dup);
     });
     bindSubKindRow(el.manualSubKindRow);
+    bindSpineArtPanel();
     el.cancelManualBtn.addEventListener("click", hideManualForm);
     el.manualForm.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -251,10 +271,12 @@
       var subKind = state.category === "book" ? getActiveSubKind(el.manualSubKindRow) : undefined;
       var author = state.category === "book" ? el.authorInput.value.trim() : "";
 
+      var spineArt = readSpineArtFromForm();
+
       if (state.editingId) {
-        updateItem(state.editingId, title, el.imageInput.value.trim(), el.notesInput.value.trim(), subKind, author);
+        updateItem(state.editingId, title, el.imageInput.value.trim(), el.notesInput.value.trim(), subKind, author, spineArt);
       } else {
-        addItem({
+        addItem(Object.assign({
           category: state.category,
           title: title,
           seriesName: title,
@@ -263,7 +285,7 @@
           notes: el.notesInput.value.trim(),
           subKind: subKind,
           source: "manual"
-        });
+        }, spineArt || {}));
       }
       hideManualForm();
     });
@@ -285,6 +307,7 @@
       el.imageInput.value = state.pendingMatch.image || "";
       el.notesInput.value = state.pendingMatch.notes || "";
       el.authorInput.value = state.pendingMatch.author || "";
+      populateSpineArtPanel(state.pendingMatch);
       hideConfirmPanel();
       showManualForm();
       renderSubKindRow(el.manualSubKindRow, subKind);
@@ -311,6 +334,7 @@
       el.imageInput.value = item.image || "";
       el.notesInput.value = item.notes || "";
       el.authorInput.value = item.author || "";
+      populateSpineArtPanel(item);
       el.manualSubmitBtn.textContent = "Save Changes";
       hideItemOverlay();
       showManualForm();
@@ -533,6 +557,11 @@
       source: data.source || "manual",
       addedAt: new Date().toISOString()
     };
+    if (data.spineImage && typeof data.spineCropStart === "number" && typeof data.spineCropEnd === "number") {
+      item.spineImage = data.spineImage;
+      item.spineCropStart = data.spineCropStart;
+      item.spineCropEnd = data.spineCropEnd;
+    }
     if (WITH_SHELVES[category]) {
       item.seriesName = data.seriesName || data.title || "Untitled";
       item.status = data.status || defaultStatus();
@@ -576,7 +605,7 @@
   // Edits an already-saved item's title/image/notes in place (see
   // editItemBtn) — addItem is only ever for something not yet in the
   // collection, this is for fixing up something that already is.
-  function updateItem(id, title, image, notes, subKind, author) {
+  function updateItem(id, title, image, notes, subKind, author, spineArt) {
     var item = findItemById(id);
     if (!item) return;
     item.title = title;
@@ -584,6 +613,15 @@
     item.notes = notes;
     item.author = author || "";
     if (subKind) item.subKind = subKind;
+    if (spineArt) {
+      item.spineImage = spineArt.spineImage;
+      item.spineCropStart = spineArt.spineCropStart;
+      item.spineCropEnd = spineArt.spineCropEnd;
+    } else {
+      delete item.spineImage;
+      delete item.spineCropStart;
+      delete item.spineCropEnd;
+    }
     saveItems();
     renderGrid();
     setStatus("Updated.");
@@ -604,6 +642,8 @@
 
   function renderGrid() {
     el.collectionTitle.textContent = CATEGORY_LABELS[state.category];
+    el.collectionTitleJp.textContent = CATEGORY_JP[state.category];
+    el.deptIcon.textContent = CATEGORY_ICON[state.category];
     var withShelves = WITH_SHELVES[state.category];
     el.comicStatusTabs.classList.toggle("hidden", !withShelves);
     el.bookSortRow.classList.toggle("hidden", state.category !== "book");
@@ -627,17 +667,24 @@
     }
 
     el.grid.innerHTML = "";
-    el.grid.className = state.category === "book" ? "shelf-grid" : "grid";
+    var isSpineShelf = SPINE_SHELF_CONFIG[state.category];
+    el.grid.className = "shelf-grid";
     var empty = items.length === 0;
-    el.emptyMsg.classList.toggle("hidden", !(empty && !search));
-    el.noMatchMsg.classList.toggle("hidden", !(empty && search));
 
-    if (state.category === "book") {
-      renderBookShelf(el.grid, items);
-    } else if (withShelves) {
-      renderSeriesGroupedGrid(el.grid, items);
+    if (isSpineShelf) {
+      el.emptyMsg.classList.toggle("hidden", !(empty && !search));
+      el.noMatchMsg.classList.toggle("hidden", !(empty && search));
+      renderShelfCategory(el.grid, items, isSpineShelf);
+    } else if (state.category === "comic") {
+      // The long-box shows its own "box is empty" state, so the generic
+      // empty/no-match paragraphs would just be redundant clutter under it.
+      el.emptyMsg.classList.add("hidden");
+      el.noMatchMsg.classList.add("hidden");
+      renderComicBox(el.grid, items);
     } else {
-      renderFlatGrid(el.grid, items, showItemOverlay);
+      el.emptyMsg.classList.toggle("hidden", !(empty && !search));
+      el.noMatchMsg.classList.toggle("hidden", !(empty && search));
+      renderFiguresCase(el.grid, items);
     }
   }
 
@@ -675,53 +722,431 @@
     });
   }
 
-  // Books & Manga: a packed shelf instead of a grid. Books and manga are
-  // split into their own sections (item.subKind, see the add/edit forms'
-  // Book/Manga toggle) and shown flat, one tile per item — unlike comics,
-  // there's rarely more than a copy or two of the same book, so there's no
-  // need to collapse into series tiles. Order within a section comes from
-  // state.bookSort (see sortBookItems) — custom drag order by default, or
-  // alphabetical/date-added/author, each ascending or descending.
-  var SHELF_ITEM_WIDTH = 92; // keep in sync with .shelf-item's width in style.css
+  // Retro collection-room redesign: Books & Manga, Movies, and Games all
+  // render as a physical shelf — real art backdrop (shelf-manga-movies.webp
+  // / shelf-games.webp, see ASSET_LIST.md), items shown as spines that pop
+  // forward to their real cover on click, one scrollable row per shelf
+  // instead of wrapping/resizing to fit every item. Comics (the long-box)
+  // and Figures (the cabinet) aren't converted yet — see LOG.md: both
+  // reference mockup assets have fixed content baked into the art itself,
+  // which can't hold a real, variable-sized collection as-is.
+  var SPINE_SHELF_CONFIG = {
+    book: { bg: "manga-movies-top", sections: true, draggable: true },
+    movie: { bg: "manga-movies-bottom", sections: false, draggable: false },
+    game: { bg: "games", sections: false, draggable: false }
+  };
 
-  function renderBookShelf(container, items) {
-    var sections = [
-      { key: "book", label: "Books", items: [] },
-      { key: "manga", label: "Manga", items: [] }
-    ];
-    items.forEach(function (it) {
-      var key = it.subKind === "manga" ? "manga" : "book";
-      sections[key === "manga" ? 1 : 0].items.push(it);
+  function renderShelfCategory(container, items, opts) {
+    var frame = document.createElement("div");
+    frame.className = "shelf-frame";
+    frame.dataset.shelfBg = opts.bg;
+
+    if (opts.sections) {
+      // Books & Manga only: split into their own labeled rows (item.subKind,
+      // see the add/edit forms' Book/Manga toggle). Order within a section
+      // comes from state.bookSort (see sortBookItems) — custom drag order by
+      // default, or alphabetical/date-added/author, each ascending or
+      // descending.
+      var sections = [
+        { key: "book", label: "Books", items: [] },
+        { key: "manga", label: "Manga", items: [] }
+      ];
+      items.forEach(function (it) {
+        var key = it.subKind === "manga" ? "manga" : "book";
+        sections[key === "manga" ? 1 : 0].items.push(it);
+      });
+
+      sections.forEach(function (section) {
+        if (!section.items.length) return;
+        section.items = sortBookItems(section.items);
+
+        var sectionEl = document.createElement("div");
+        sectionEl.className = "shelf-section";
+
+        var label = document.createElement("div");
+        label.className = "shelf-section-label";
+        label.textContent = section.label;
+        sectionEl.appendChild(label);
+        sectionEl.appendChild(buildSpineScrollRow(section.items, {
+          groupKey: section.key,
+          draggable: opts.draggable
+        }));
+        frame.appendChild(sectionEl);
+      });
+    } else {
+      frame.appendChild(buildSpineScrollRow(items, { draggable: opts.draggable }));
+    }
+
+    container.appendChild(frame);
+  }
+
+  // A fixed-height shelf that scrolls horizontally instead of wrapping or
+  // resizing once it's full — keeps the real shelf-art backdrop at a
+  // constant size no matter how large the collection gets.
+  function buildSpineScrollRow(items, opts) {
+    var wrap = document.createElement("div");
+    wrap.className = "shelf-scroll-wrap";
+
+    var row = document.createElement("div");
+    row.className = "shelf-scroll-row";
+    items.forEach(function (item) {
+      row.appendChild(buildSpineTile(item, opts));
     });
 
-    var containerWidth = container.clientWidth || 320;
-    var perRow = Math.max(1, Math.floor(containerWidth / SHELF_ITEM_WIDTH));
+    var prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "shelf-scroll-btn prev";
+    prevBtn.setAttribute("aria-label", "Scroll shelf left");
+    prevBtn.textContent = "‹";
+    prevBtn.addEventListener("click", function () {
+      row.scrollBy({ left: -160, behavior: "smooth" });
+    });
 
-    sections.forEach(function (section) {
-      if (!section.items.length) return;
+    var nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "shelf-scroll-btn next";
+    nextBtn.setAttribute("aria-label", "Scroll shelf right");
+    nextBtn.textContent = "›";
+    nextBtn.addEventListener("click", function () {
+      row.scrollBy({ left: 160, behavior: "smooth" });
+    });
 
-      section.items = sortBookItems(section.items);
+    wrap.appendChild(prevBtn);
+    wrap.appendChild(row);
+    wrap.appendChild(nextBtn);
+    return wrap;
+  }
 
-      var sectionEl = document.createElement("div");
-      sectionEl.className = "shelf-section";
+  // A plausible spine built from the item's own title/metadata — not the
+  // front cover rotated sideways. Color and thickness are deterministic
+  // (hashed from the title) so the same item always looks the same, and
+  // vary enough that a shelf of real titles doesn't look uniform.
+  var SPINE_PALETTE = ["#C8102E", "#2E6BE0", "#1F6E4A", "#FFD23B", "#6B4226", "#7A0A1D", "#19171A", "#8B5A2B"];
 
-      var label = document.createElement("div");
-      label.className = "shelf-section-label";
-      label.textContent = section.label;
-      sectionEl.appendChild(label);
+  function hashStr(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h;
+  }
 
-      for (var i = 0; i < section.items.length; i += perRow) {
-        var row = document.createElement("div");
-        row.className = "shelf-row";
-        section.items.slice(i, i + perRow).forEach(function (item) {
-          row.appendChild(buildShelfTile(item, section.key));
-        });
-        sectionEl.appendChild(row);
+  function spineColorFor(item) {
+    return SPINE_PALETTE[hashStr(item.title || item.seriesName || "x") % SPINE_PALETTE.length];
+  }
+
+  function spineWidthFor(item) {
+    return 24 + (hashStr((item.title || "") + "w") % 16); // 24-39px
+  }
+
+  // A real spine image is an optional crop out of a full-wrap cover scan
+  // (back | spine | front, see SPINE_ART.md) — cropCrop percentages mark
+  // where the spine strip sits in that image. Falls back to the generated
+  // colored-bar spine when absent, same as every item before this existed.
+  var SPINE_HEIGHT_PX = 142; // keep in sync with .spine's height in style.css
+
+  function hasRealSpineArt(item) {
+    return !!item.spineImage &&
+      typeof item.spineCropStart === "number" &&
+      typeof item.spineCropEnd === "number" &&
+      item.spineCropEnd > item.spineCropStart;
+  }
+
+  // Crops imgEl to just the [startPct, endPct] horizontal slice of its own
+  // natural width, at full natural height scaled to targetHeightPx — i.e.
+  // the real proportions of that slice, no stretching. containerEl must be
+  // position:relative/overflow:hidden; imgEl must be position:absolute
+  // (both set here). Needs the image already loaded (naturalWidth/Height).
+  function applyImageCrop(naturalWidth, naturalHeight, startPct, endPct, containerEl, imgEl, targetHeightPx) {
+    var sliceWidthPct = endPct - startPct;
+    if (sliceWidthPct <= 0 || !naturalWidth || !naturalHeight) return;
+    var renderedFullWidth = targetHeightPx * (naturalWidth / naturalHeight);
+    var sliceWidthPx = renderedFullWidth * (sliceWidthPct / 100);
+
+    containerEl.style.position = "relative";
+    containerEl.style.overflow = "hidden";
+    containerEl.style.height = targetHeightPx + "px";
+    containerEl.style.width = sliceWidthPx + "px";
+
+    imgEl.style.position = "absolute";
+    imgEl.style.top = "0";
+    imgEl.style.height = targetHeightPx + "px";
+    imgEl.style.width = renderedFullWidth + "px";
+    imgEl.style.maxWidth = "none";
+    imgEl.style.left = -(startPct / 100 * renderedFullWidth) + "px";
+
+    return sliceWidthPx;
+  }
+
+  function buildSpineTile(item, opts) {
+    opts = opts || {};
+    var tile = document.createElement("div");
+    tile.className = "spine";
+    tile.dataset.id = item.id;
+    if (opts.groupKey) tile.dataset.group = opts.groupKey;
+    tile.style.width = spineWidthFor(item) + "px"; // provisional until real art (if any) loads
+    tile.tabIndex = 0;
+    tile.setAttribute("role", "button");
+    tile.setAttribute("aria-label", item.title || "Item");
+
+    if (hasRealSpineArt(item)) {
+      tile.classList.add("real-spine");
+      var cropWrap = document.createElement("div");
+      cropWrap.className = "spine-real-crop";
+      var cropImg = document.createElement("img");
+      cropImg.alt = "";
+      cropImg.src = item.spineImage;
+      cropWrap.appendChild(cropImg);
+      tile.appendChild(cropWrap);
+      cropImg.addEventListener("load", function () {
+        var w = applyImageCrop(cropImg.naturalWidth, cropImg.naturalHeight, item.spineCropStart, item.spineCropEnd, cropWrap, cropImg, SPINE_HEIGHT_PX);
+        if (w) tile.style.width = w + "px";
+      });
+      cropImg.addEventListener("error", function () {
+        // Broken spine-art URL: fall back to the generated spine rather than
+        // showing an empty sliver.
+        cropWrap.remove();
+        tile.classList.remove("real-spine");
+        tile.style.background = spineColorFor(item);
+        var label = document.createElement("span");
+        label.className = "spine-label";
+        label.textContent = item.title || "";
+        tile.insertBefore(label, tile.firstChild);
+      });
+    } else {
+      tile.style.background = spineColorFor(item);
+      var labelSpan = document.createElement("span");
+      labelSpan.className = "spine-label";
+      labelSpan.textContent = item.title || "";
+      tile.appendChild(labelSpan);
+    }
+
+    var rest = document.createElement("div");
+    rest.innerHTML =
+      '<img class="spine-cover" src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
+      statusDotsHtml(item);
+    while (rest.firstChild) tile.appendChild(rest.firstChild);
+
+    function activate() {
+      if (tile.classList.contains("expanded")) {
+        showItemOverlay(item);
+        return;
       }
+      collapseSiblingSpines(tile);
+      tile.classList.add("expanded");
+      tile.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    }
 
-      container.appendChild(sectionEl);
+    tile.addEventListener("click", function (e) {
+      if (tile.dataset.dragged === "1") { tile.dataset.dragged = ""; return; }
+      e.stopPropagation();
+      activate();
+    });
+    tile.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+      if (e.key === "Escape") tile.classList.remove("expanded");
+    });
+
+    if (opts.draggable) bindShelfDrag(tile, item, opts.groupKey);
+    return tile;
+  }
+
+  function collapseSiblingSpines(tile) {
+    var row = tile.closest(".shelf-scroll-row");
+    if (!row) return;
+    row.querySelectorAll(".spine.expanded").forEach(function (el) {
+      if (el !== tile) el.classList.remove("expanded");
     });
   }
+
+  // ---------- figures: a lit glass display case ----------
+
+  function renderFiguresCase(container, items) {
+    var glass = document.createElement("div");
+    glass.className = "glass-case";
+
+    var light = document.createElement("div");
+    light.className = "cabinet-light";
+    glass.appendChild(light);
+
+    var grid = document.createElement("div");
+    grid.className = "figures-grid";
+    items.forEach(function (item) {
+      var fig = document.createElement("button");
+      fig.type = "button";
+      fig.className = "figure-item";
+      fig.setAttribute("aria-label", item.title || "Figure");
+      fig.innerHTML = '<img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">';
+      fig.addEventListener("click", function () { showItemOverlay(item); });
+      grid.appendChild(fig);
+    });
+    glass.appendChild(grid);
+
+    var reflection = document.createElement("div");
+    reflection.className = "glass-reflection";
+    glass.appendChild(reflection);
+
+    container.appendChild(glass);
+  }
+
+  // ---------- comics: the long-box ----------
+  // Shows every owned issue (flattened across series — not grouped), fanned
+  // out like a real comic-box browsing session: the card nearest the
+  // pointer/selection rises forward. Arrow keys, the mouse wheel, and touch
+  // swipe all shift the selection; Enter or a click opens that issue.
+
+  var comicBoxState = { selected: 0, items: [] };
+
+  function renderComicBox(container, items) {
+    comicBoxState.items = items;
+    if (comicBoxState.selected >= items.length) comicBoxState.selected = Math.max(0, items.length - 1);
+
+    var showcase = document.createElement("div");
+    showcase.className = "comic-showcase";
+
+    var callout = document.createElement("div");
+    callout.className = "comic-callout";
+    callout.innerHTML = 'BROWSE<br>YOUR BOX!<small>コミックを探そう！</small>';
+    showcase.appendChild(callout);
+
+    var scene = document.createElement("div");
+    scene.className = "box-scene";
+
+    var papers = document.createElement("div");
+    papers.className = "comic-papers";
+    papers.id = "comicPapers";
+    papers.tabIndex = 0;
+    papers.setAttribute("role", "listbox");
+    papers.setAttribute("aria-label", "Browse your comic box with arrow keys, the mouse wheel, or touch");
+    scene.appendChild(papers);
+
+    var lip = document.createElement("div");
+    lip.className = "longbox-lip";
+    scene.appendChild(lip);
+
+    var front = document.createElement("div");
+    front.className = "longbox-front";
+    var label = document.createElement("div");
+    label.className = "longbox-label";
+    label.innerHTML = "<span>MY COMIC COLLECTION</span><b>" + String(items.length).padStart(3, "0") + " ISSUES</b>";
+    front.appendChild(label);
+    scene.appendChild(front);
+
+    var controls = document.createElement("div");
+    controls.className = "comic-controls";
+    var prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.setAttribute("aria-label", "Previous comic");
+    prevBtn.textContent = "←";
+    var current = document.createElement("strong");
+    current.id = "comicCurrent";
+    var nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.setAttribute("aria-label", "Next comic");
+    nextBtn.textContent = "→";
+    controls.append(prevBtn, current, nextBtn);
+    scene.appendChild(controls);
+
+    showcase.appendChild(scene);
+    container.appendChild(showcase);
+
+    prevBtn.addEventListener("click", function () { shiftComic(-1); });
+    nextBtn.addEventListener("click", function () { shiftComic(1); });
+
+    papers.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") { e.preventDefault(); shiftComic(1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); shiftComic(-1); }
+      else if (e.key === "Enter") {
+        var it = comicBoxState.items[comicBoxState.selected];
+        if (it) showItemOverlay(it);
+      }
+    });
+    papers.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      shiftComic(e.deltaY > 0 || e.deltaX > 0 ? 1 : -1);
+    }, { passive: false });
+    var touchStartX = 0;
+    papers.addEventListener("touchstart", function (e) { touchStartX = e.touches[0].clientX; }, { passive: true });
+    papers.addEventListener("touchend", function (e) {
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 30) shiftComic(dx < 0 ? 1 : -1);
+    }, { passive: true });
+
+    renderComicCards();
+  }
+
+  function shiftComic(amount) {
+    var len = comicBoxState.items.length;
+    if (!len) return;
+    comicBoxState.selected = (comicBoxState.selected + amount + len) % len;
+    renderComicCards();
+  }
+
+  // Shows a window of up to 5 cards centered on the selection — the box
+  // doesn't try to lay out an arbitrarily large collection flat; it shifts
+  // which handful is fanned out, same as physically flipping through a box.
+  var COMIC_WINDOW = 5;
+
+  function renderComicCards() {
+    var papers = document.getElementById("comicPapers");
+    var current = document.getElementById("comicCurrent");
+    if (!papers) return;
+    papers.innerHTML = "";
+
+    var items = comicBoxState.items;
+    var total = items.length;
+    if (!total) {
+      papers.appendChild(text("div", "empty-on-shelf", "YOUR COMIC BOX IS EMPTY"));
+      if (current) current.textContent = "NO ISSUES";
+      return;
+    }
+
+    var windowSize = Math.min(COMIC_WINDOW, total);
+    var start = Math.min(
+      Math.max(0, comicBoxState.selected - Math.floor(windowSize / 2)),
+      Math.max(0, total - windowSize)
+    );
+    var visible = items.slice(start, start + windowSize);
+    var n = visible.length;
+
+    visible.forEach(function (item, i) {
+      var actual = start + i;
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "comic-card" + (actual === comicBoxState.selected ? " selected" : "");
+      var tilt = (i - (n - 1) / 2) * -2;
+      var selected = actual === comicBoxState.selected;
+      card.style.left = (n === 1 ? 40 : 4 + i * (73 / (n - 1))) + "%";
+      card.style.transform = "translateY(" + (selected ? "-40px" : "0px") + ") rotate(" + (selected ? 0 : tilt) + "deg)";
+      card.style.zIndex = selected ? 40 : (n - i);
+      card.setAttribute("aria-label", item.title || "Comic issue");
+      card.innerHTML = '<img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">';
+      card.addEventListener("pointerenter", function () {
+        comicBoxState.selected = actual;
+        renderComicCards();
+      });
+      card.addEventListener("click", function () { showItemOverlay(item); });
+      papers.appendChild(card);
+    });
+
+    if (current) {
+      current.textContent = String(comicBoxState.selected + 1).padStart(2, "0") + " / " + String(total).padStart(2, "0");
+    }
+  }
+
+  function text(tag, cls, content) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    e.textContent = content;
+    return e;
+  }
+
+  // Clicking anywhere outside a shelf collapses whatever's expanded —
+  // otherwise a popped-forward spine stays stuck open after you move on.
+  document.addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest(".spine")) return;
+    document.querySelectorAll(".spine.expanded").forEach(function (el) {
+      el.classList.remove("expanded");
+    });
+  });
 
   // Four ways to look at a shelf section: the user's own drag-and-drop
   // order (sortIndex), alphabetical by title, oldest/newest added, or by
@@ -754,28 +1179,6 @@
     el.bookSortDirectionBtn.setAttribute("aria-label", asc ? "Sort ascending" : "Sort descending");
   }
 
-  function buildShelfTile(item, groupKey) {
-    var tile = document.createElement("div");
-    tile.className = "shelf-item";
-    tile.dataset.id = item.id;
-    tile.dataset.group = groupKey;
-    tile.innerHTML =
-      '<div class="shelf-cover"><img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
-      statusDotsHtml(item) +
-      "</div>" +
-      '<div class="shelf-plank"></div>';
-    tile.addEventListener("click", function () {
-      // Suppress the click a drag leaves behind — see bindShelfDrag.
-      if (tile.dataset.dragged === "1") {
-        tile.dataset.dragged = "";
-        return;
-      }
-      showItemOverlay(item);
-    });
-    bindShelfDrag(tile, item, groupKey);
-    return tile;
-  }
-
   // Press-and-hold (not a plain tap, which should still open the item) to
   // pick up a shelf tile, drag it over another tile in the same section, and
   // drop it there. Uses Pointer Events so it works with touch, not just a
@@ -805,7 +1208,7 @@
       tile.classList.add("dragging");
       var rect = tile.getBoundingClientRect();
       ghost = tile.cloneNode(true);
-      ghost.className = "shelf-item shelf-drag-ghost";
+      ghost.className = "spine shelf-drag-ghost";
       ghost.style.width = rect.width + "px";
       document.body.appendChild(ghost);
       moveGhost(x, y);
@@ -816,7 +1219,7 @@
       if (ghost) ghost.style.display = "none";
       var under = document.elementFromPoint(x, y);
       if (ghost) ghost.style.display = "";
-      var target = under && under.closest(".shelf-item");
+      var target = under && under.closest(".spine");
       if (!target || target.dataset.group !== groupKey || target === tile) {
         dropTargetId = null;
         return;
@@ -969,6 +1372,118 @@
     el.manualDuplicateWarning.classList.add("hidden");
     el.manualSubmitBtn.textContent = "Add to Collection";
     state.editingId = null;
+    populateSpineArtPanel(null);
+  }
+
+  // ---------- real spine art (crop a full-wrap scan, see SPINE_ART.md) ----------
+
+  var spineCropNatural = { width: 0, height: 0 };
+
+  function bindSpineArtPanel() {
+    el.spineArtToggle.addEventListener("click", function () {
+      el.spineArtPanel.classList.toggle("hidden");
+    });
+    el.spineImageInput.addEventListener("change", loadSpineCropImage);
+    el.spineCropStartInput.addEventListener("input", onSpineCropInputChange);
+    el.spineCropEndInput.addEventListener("input", onSpineCropInputChange);
+    el.spineArtClearBtn.addEventListener("click", function () {
+      el.spineImageInput.value = "";
+      resetSpineArtPreview();
+    });
+  }
+
+  function loadSpineCropImage() {
+    var url = el.spineImageInput.value.trim();
+    if (!url) { resetSpineArtPreview(); return; }
+    var probe = new Image();
+    probe.onload = function () {
+      spineCropNatural.width = probe.naturalWidth;
+      spineCropNatural.height = probe.naturalHeight;
+      el.spineCropPreviewImg.src = url;
+      el.spineCropPreviewWrap.classList.remove("hidden");
+      el.spineCropControls.classList.remove("hidden");
+      el.spineLivePreviewRow.classList.remove("hidden");
+      el.spineLivePreview.innerHTML = "";
+      var img = document.createElement("img");
+      img.alt = "";
+      img.src = url;
+      el.spineLivePreview.appendChild(img);
+      updateSpineCropUI();
+    };
+    probe.onerror = function () {
+      resetSpineArtPreview();
+      setStatus("Couldn't load that image — check the URL.");
+    };
+    probe.src = url;
+  }
+
+  function onSpineCropInputChange() {
+    var start = Number(el.spineCropStartInput.value);
+    var end = Number(el.spineCropEndInput.value);
+    // Keep a minimum 1% gap without fighting whichever handle the user is
+    // actually dragging.
+    if (end <= start) {
+      if (document.activeElement === el.spineCropStartInput) {
+        end = Math.min(100, start + 1);
+        el.spineCropEndInput.value = end;
+      } else {
+        start = Math.max(0, end - 1);
+        el.spineCropStartInput.value = start;
+      }
+    }
+    updateSpineCropUI();
+  }
+
+  function updateSpineCropUI() {
+    var start = Number(el.spineCropStartInput.value);
+    var end = Number(el.spineCropEndInput.value);
+    el.spineCropStartLabel.textContent = start + "%";
+    el.spineCropEndLabel.textContent = end + "%";
+    el.spineCropMaskLeft.style.left = "0";
+    el.spineCropMaskLeft.style.width = start + "%";
+    el.spineCropMaskRight.style.left = end + "%";
+    el.spineCropMaskRight.style.width = (100 - end) + "%";
+
+    var img = el.spineLivePreview.querySelector("img");
+    if (img && spineCropNatural.width && spineCropNatural.height) {
+      applyImageCrop(spineCropNatural.width, spineCropNatural.height, start, end, el.spineLivePreview, img, 100);
+    }
+  }
+
+  function resetSpineArtPreview() {
+    spineCropNatural.width = 0;
+    spineCropNatural.height = 0;
+    el.spineCropPreviewWrap.classList.add("hidden");
+    el.spineCropControls.classList.add("hidden");
+    el.spineLivePreviewRow.classList.add("hidden");
+    el.spineLivePreview.innerHTML = "";
+  }
+
+  // Shows/hides and fills the panel when opening the form for an existing
+  // item (edit) vs. a brand-new one (item === null).
+  function populateSpineArtPanel(item) {
+    if (item && hasRealSpineArt(item)) {
+      el.spineArtPanel.classList.remove("hidden");
+      el.spineImageInput.value = item.spineImage;
+      el.spineCropStartInput.value = item.spineCropStart;
+      el.spineCropEndInput.value = item.spineCropEnd;
+      loadSpineCropImage();
+    } else {
+      el.spineArtPanel.classList.add("hidden");
+      el.spineImageInput.value = "";
+      el.spineCropStartInput.value = 44;
+      el.spineCropEndInput.value = 50;
+      resetSpineArtPreview();
+    }
+  }
+
+  function readSpineArtFromForm() {
+    var url = el.spineImageInput.value.trim();
+    if (!url) return null;
+    var start = Number(el.spineCropStartInput.value);
+    var end = Number(el.spineCropEndInput.value);
+    if (!(end > start)) return null;
+    return { spineImage: url, spineCropStart: start, spineCropEnd: end };
   }
 
   // ---------- title search ----------
