@@ -1026,8 +1026,104 @@
     fig.className = "figure-item";
     fig.setAttribute("aria-label", item.title || "Figure");
     fig.innerHTML = '<img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">';
-    fig.addEventListener("click", function () { showItemOverlay(item); });
+    fig.addEventListener("click", function () {
+      openFigureHold(item, fig.querySelector("img"));
+    });
     return fig;
+  }
+
+  // Clicking a figure "pulls it off the shelf" — it zooms toward the
+  // viewer, like picking it up to look at it, instead of jumping straight
+  // to the edit panel. Clicking it again (now that you're "holding" it)
+  // opens the real edit overlay; clicking the dimmed backdrop (or Escape)
+  // puts it back on the shelf instead. A FLIP-style animation: a cloned
+  // <img> is given the clicked tile's exact on-screen rect, then animated
+  // to a big centered one via a CSS transition on left/top/width/height.
+  var figureHoldState = null;
+
+  function figureHoldTargetRect(originRect) {
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var maxWidth = Math.min(vw * 0.6, 380);
+    var maxHeight = vh * 0.62;
+    var aspect = (originRect.width || 1) / (originRect.height || 1);
+    var width = maxWidth, height = width / aspect;
+    if (height > maxHeight) { height = maxHeight; width = height * aspect; }
+    return { left: (vw - width) / 2, top: (vh - height) / 2, width: width, height: height };
+  }
+
+  function openFigureHold(item, triggerImgEl) {
+    if (figureHoldState || !triggerImgEl) return;
+    var originRect = triggerImgEl.getBoundingClientRect();
+
+    var backdrop = document.createElement("div");
+    backdrop.className = "figure-hold-backdrop";
+    backdrop.addEventListener("click", function () { closeFigureHold(false); });
+
+    var img = document.createElement("img");
+    img.className = "figure-hold-img";
+    img.alt = item.title || "Figure";
+    img.src = item.image || "";
+    img.style.left = originRect.left + "px";
+    img.style.top = originRect.top + "px";
+    img.style.width = originRect.width + "px";
+    img.style.height = originRect.height + "px";
+    img.addEventListener("click", function (e) {
+      e.stopPropagation();
+      closeFigureHold(true);
+    });
+
+    var hint = document.createElement("div");
+    hint.className = "figure-hold-hint";
+    hint.textContent = "Tap again to edit";
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(img);
+    document.body.appendChild(hint);
+    figureHoldState = { item: item, backdrop: backdrop, img: img, hint: hint, originRect: originRect };
+
+    requestAnimationFrame(function () {
+      backdrop.classList.add("show");
+      hint.classList.add("show");
+      var target = figureHoldTargetRect(originRect);
+      img.style.left = target.left + "px";
+      img.style.top = target.top + "px";
+      img.style.width = target.width + "px";
+      img.style.height = target.height + "px";
+    });
+
+    document.addEventListener("keydown", onFigureHoldKeydown);
+  }
+
+  function onFigureHoldKeydown(e) {
+    if (e.key === "Escape") closeFigureHold(false);
+  }
+
+  function closeFigureHold(openEdit) {
+    if (!figureHoldState) return;
+    var held = figureHoldState;
+    figureHoldState = null;
+    document.removeEventListener("keydown", onFigureHoldKeydown);
+
+    if (openEdit) {
+      held.backdrop.remove();
+      held.img.remove();
+      held.hint.remove();
+      showItemOverlay(held.item);
+      return;
+    }
+
+    // Put it back: animate to the shelf tile's original rect, then remove.
+    held.backdrop.classList.remove("show");
+    held.hint.classList.remove("show");
+    held.img.style.left = held.originRect.left + "px";
+    held.img.style.top = held.originRect.top + "px";
+    held.img.style.width = held.originRect.width + "px";
+    held.img.style.height = held.originRect.height + "px";
+    setTimeout(function () {
+      held.backdrop.remove();
+      held.img.remove();
+      held.hint.remove();
+    }, 420);
   }
 
   function fillFigureFace(face, pageIndex) {
@@ -1535,6 +1631,11 @@
     el.manualSubKindRow.classList.toggle("hidden", state.category !== "book");
     el.authorInput.classList.toggle("hidden", state.category !== "book");
     el.coverBgRemoveHint.classList.toggle("hidden", state.category !== "figure");
+    // Spine art only makes sense for a category that's actually shelved by
+    // its spine (books/manga, movies, games) — a figure has no spine, so
+    // hide the option (and force the panel closed) entirely for Figures.
+    el.spineArtToggle.classList.toggle("hidden", state.category === "figure");
+    if (state.category === "figure") el.spineArtPanel.classList.add("hidden");
     el.titleInput.focus();
   }
 
@@ -1759,6 +1860,55 @@
     el.coverCropEndNumber.addEventListener("input", onCoverCropNumberChange);
     el.coverCropApplyBtn.addEventListener("click", applyCoverCrop);
     el.coverCropCancelBtn.addEventListener("click", resetCoverCropPanel);
+    // A pasted "Cover image URL" (as opposed to the upload-and-crop tool
+    // above) gets the same Figures-only background removal — best effort,
+    // since a cross-origin host that doesn't send CORS headers taints the
+    // canvas and makes this impossible; see attemptUrlBackgroundRemoval.
+    el.imageInput.addEventListener("change", function () {
+      attemptUrlBackgroundRemoval(el.imageInput.value.trim());
+    });
+  }
+
+  // Only runs for Figures, and only on a URL actually typed/pasted into
+  // the field (programmatic value assignment elsewhere in this file, e.g.
+  // after the upload-and-crop flow above runs, never fires "change"). Asks
+  // first — not every figure photo has a background to remove — then tries
+  // to load the image cross-origin and remove it the same way the upload
+  // flow does. If the image host doesn't send CORS headers the canvas
+  // comes back tainted and reading its pixels throws; caught below, and
+  // the pasted URL is left exactly as typed rather than silently
+  // half-processed.
+  function attemptUrlBackgroundRemoval(url) {
+    if (state.category !== "figure" || !url) return;
+    askRemoveBackground(function (shouldRemove) {
+      if (!shouldRemove) return;
+
+      var probe = new Image();
+      probe.crossOrigin = "anonymous";
+      probe.onload = function () {
+        // The status line lives inside the (possibly collapsed) upload
+        // panel — open it so a message triggered by the plain URL field,
+        // above/outside that panel, is actually visible.
+        el.coverCropPanel.classList.remove("hidden");
+        var canvas;
+        try {
+          canvas = document.createElement("canvas");
+          canvas.width = probe.naturalWidth;
+          canvas.height = probe.naturalHeight;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(probe, 0, 0);
+          ctx.getImageData(0, 0, 1, 1); // throws if the canvas is cross-origin-tainted
+        } catch (err) {
+          el.coverUploadStatus.textContent = "Couldn't remove the background from that URL (the image's host doesn't allow it) — using it as-is.";
+          return;
+        }
+        canvas = downscaleCanvas(canvas, 1200);
+        canvas = removeBackgroundAndAutocrop(canvas);
+        uploadProcessedCover(canvas, true);
+      };
+      probe.onerror = function () {}; // leave it to the existing broken-image handling elsewhere
+      probe.src = url;
+    });
   }
 
   function onCoverFilePicked() {
@@ -1866,10 +2016,11 @@
   // Draws just the [start, end] horizontal slice (full height, the same
   // crop shape as the spine tool) onto an offscreen canvas at native
   // resolution, uploads that as a new file, and fills the Cover image URL
-  // field with the result. For Figures specifically, also strips the
-  // photo's background first (see removeBackgroundAndAutocrop below) so a
-  // figure dropped onto the display-case shelf floats over its own pedestal
-  // shadow instead of carrying its original backdrop.
+  // field with the result. For Figures specifically, asks first whether to
+  // also strip the photo's background (see removeBackgroundAndAutocrop
+  // below) — not every figure photo has one to remove (some are already a
+  // transparent cutout, or a studio render with nothing to strip), so this
+  // is never silent/automatic.
   function applyCoverCrop() {
     var start = Number(el.coverCropStartInput.value);
     var end = Number(el.coverCropEndInput.value);
@@ -1885,19 +2036,34 @@
       0, 0, end - start, coverCropState.naturalHeight
     );
 
-    var isFigure = state.category === "figure";
-    if (isFigure) {
-      canvas = downscaleCanvas(canvas, 1200);
-      canvas = removeBackgroundAndAutocrop(canvas);
+    if (state.category !== "figure") {
+      uploadProcessedCover(canvas, false);
+      return;
     }
 
+    askRemoveBackground(function (shouldRemove) {
+      var finalCanvas = canvas;
+      if (shouldRemove) {
+        finalCanvas = downscaleCanvas(canvas, 1200);
+        finalCanvas = removeBackgroundAndAutocrop(finalCanvas);
+      }
+      uploadProcessedCover(finalCanvas, true);
+    });
+  }
+
+  // Shared by applyCoverCrop above and attemptUrlBackgroundRemoval below:
+  // uploads the given canvas and fills the Cover image URL field with the
+  // hosted result. Figures always upload as PNG (even when background
+  // removal was declined) since a figure photo may already be a
+  // transparent cutout worth preserving; every other category keeps JPEG.
+  function uploadProcessedCover(canvas, asPng) {
     el.coverUploadStatus.textContent = "Uploading…";
     canvas.toBlob(function (blob) {
       if (!blob) {
         el.coverUploadStatus.textContent = "Couldn't process that image.";
         return;
       }
-      uploadBlobToWorker(blob, isFigure ? "cover.png" : "cover.jpg")
+      uploadBlobToWorker(blob, asPng ? "cover.png" : "cover.jpg")
         .then(function (url) {
           el.imageInput.value = url;
           el.coverUploadStatus.textContent = "Uploaded.";
@@ -1906,7 +2072,35 @@
         .catch(function (err) {
           el.coverUploadStatus.textContent = "Upload failed: " + err.message;
         });
-    }, isFigure ? "image/png" : "image/jpeg", 0.92);
+    }, asPng ? "image/png" : "image/jpeg", 0.92);
+  }
+
+  // A small inline Yes/No prompt in place of the status line — used before
+  // ever running background removal, since it's a real "maybe, maybe not"
+  // choice (a figure photo might already have no background to remove),
+  // not something to decide silently on the user's behalf.
+  function askRemoveBackground(onDecision) {
+    el.coverCropPanel.classList.remove("hidden");
+    el.coverUploadStatus.innerHTML = "";
+    var question = document.createElement("span");
+    question.textContent = "Remove this photo's background automatically? ";
+    var yesBtn = document.createElement("button");
+    yesBtn.type = "button";
+    yesBtn.className = "btn primary bg-remove-choice";
+    yesBtn.textContent = "Yes, remove it";
+    var noBtn = document.createElement("button");
+    noBtn.type = "button";
+    noBtn.className = "btn bg-remove-choice";
+    noBtn.textContent = "No, keep as-is";
+    yesBtn.addEventListener("click", function () {
+      el.coverUploadStatus.textContent = "";
+      onDecision(true);
+    });
+    noBtn.addEventListener("click", function () {
+      el.coverUploadStatus.textContent = "";
+      onDecision(false);
+    });
+    el.coverUploadStatus.append(question, yesBtn, noBtn);
   }
 
   // ---------- figures: automatic background removal on cover upload ----------
@@ -1920,7 +2114,8 @@
   // room, a cluttered desk) won't fully disappear, since it isn't one
   // connected tone — there's no ML segmentation behind this.
 
-  var BG_REMOVE_COLOR_TOLERANCE = 28; // Euclidean RGB distance between adjacent pixels
+  var BG_REMOVE_COLOR_TOLERANCE = 24; // Euclidean RGB distance between adjacent pixels in the flood-fill chain
+  var BG_REMOVE_ANCHOR_TOLERANCE = 42; // Euclidean RGB distance from the averaged background color overall
 
   function downscaleCanvas(canvas, maxDim) {
     var longest = Math.max(canvas.width, canvas.height);
@@ -1951,28 +2146,54 @@
       var db = data[i1 * 4 + 2] - data[i2 * 4 + 2];
       return Math.sqrt(dr * dr + dg * dg + db * db);
     }
-    function pushSeed(x, y) {
-      var i = idx(x, y);
-      if (!visited[i]) { visited[i] = 1; queue[qTail++] = i; }
-    }
-    for (var sx = 0; sx < w; sx++) { pushSeed(sx, 0); pushSeed(sx, h - 1); }
-    for (var sy = 0; sy < h; sy++) { pushSeed(0, sy); pushSeed(w - 1, sy); }
 
-    // Flood fill from every border pixel, spreading through neighbors whose
-    // color is close to the pixel that reached them (not a single global
-    // seed color) — tolerates the slight lighting gradient a real product
-    // photo's backdrop usually has, while still stopping at the figure's
-    // actual edge.
+    // The background color isn't sampled from one pixel but averaged across
+    // every border pixel, then every removal decision is checked against
+    // that single fixed anchor (not just the previous pixel in the chain).
+    // A pure "close to the previous step" flood fill drifts: a long chain
+    // of small color changes (ordinary shading/gradient on the figure
+    // itself) can add up to something far from the real background color,
+    // tunneling the fill straight through parts of the figure that happen
+    // to be a similar tone to the backdrop (seen on a real figure photo
+    // where metallic-gray parts sat close enough to a light-gray backdrop
+    // to leak through). Anchoring every pixel back to one fixed reference
+    // color stops that drift.
+    var anchorR = 0, anchorG = 0, anchorB = 0, seedCount = 0;
+    var seeds = [];
+    function addSeed(x, y) {
+      var i = idx(x, y);
+      if (visited[i]) return;
+      visited[i] = 1;
+      seeds.push(i);
+      anchorR += data[i * 4]; anchorG += data[i * 4 + 1]; anchorB += data[i * 4 + 2];
+      seedCount++;
+    }
+    for (var sx = 0; sx < w; sx++) { addSeed(sx, 0); addSeed(sx, h - 1); }
+    for (var sy = 0; sy < h; sy++) { addSeed(0, sy); addSeed(w - 1, sy); }
+    anchorR /= seedCount; anchorG /= seedCount; anchorB /= seedCount;
+
+    function anchorDist(i) {
+      var dr = data[i * 4] - anchorR;
+      var dg = data[i * 4 + 1] - anchorG;
+      var db = data[i * 4 + 2] - anchorB;
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+    for (var s = 0; s < seeds.length; s++) queue[qTail++] = seeds[s];
+
+    // A candidate neighbor must be both close to the pixel that reached it
+    // (tolerates a real gradient across the backdrop) AND close to the
+    // overall background anchor color (stops that from drifting into an
+    // unrelated tone) — admitted only if it passes both checks.
     var removed = new Uint8Array(w * h);
     while (qHead < qTail) {
       var i = queue[qHead++];
       removed[i] = 1;
       var x = i % w, y = (i / w) | 0;
       var nx, ny, ni;
-      if (x > 0) { nx = x - 1; ni = idx(nx, y); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
-      if (x < w - 1) { nx = x + 1; ni = idx(nx, y); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
-      if (y > 0) { ny = y - 1; ni = idx(x, ny); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
-      if (y < h - 1) { ny = y + 1; ni = idx(x, ny); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+      if (x > 0) { nx = x - 1; ni = idx(nx, y); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE && anchorDist(ni) <= BG_REMOVE_ANCHOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+      if (x < w - 1) { nx = x + 1; ni = idx(nx, y); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE && anchorDist(ni) <= BG_REMOVE_ANCHOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+      if (y > 0) { ny = y - 1; ni = idx(x, ny); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE && anchorDist(ni) <= BG_REMOVE_ANCHOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+      if (y < h - 1) { ny = y + 1; ni = idx(x, ny); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE && anchorDist(ni) <= BG_REMOVE_ANCHOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
     }
 
     var minX = w, minY = h, maxX = -1, maxY = -1;
