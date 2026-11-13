@@ -1906,7 +1906,17 @@
         canvas = removeBackgroundAndAutocrop(canvas);
         uploadProcessedCover(canvas, true);
       };
-      probe.onerror = function () {}; // leave it to the existing broken-image handling elsewhere
+      probe.onerror = function () {
+        // Some hosts (seen with images.bigbadtoystore.com) don't just
+        // taint the canvas — they refuse the cross-origin request outright,
+        // so the image never loads at all under crossOrigin="anonymous"
+        // and onload never fires either. Previously this failed silently
+        // (no message, no change to the field), which looked like "nothing
+        // happened" rather than "can't be done for this image" — now says
+        // so, same as the getImageData-taint case above.
+        el.coverCropPanel.classList.remove("hidden");
+        el.coverUploadStatus.textContent = "Couldn't remove the background from that URL (the image's host doesn't allow it) — using it as-is.";
+      };
       probe.src = url;
     });
   }

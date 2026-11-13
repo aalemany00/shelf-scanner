@@ -1042,3 +1042,37 @@ Test item deleted afterward.
 - The "ask first" prompt is plain inline buttons, not a modal — if Adrian
   adds a second Figures-only prompt later, revisit whether `askRemoveBackground`
   should become a small reusable dialog instead of one-off DOM nodes.
+
+## 2026-11-12 (fix: silent failure on a URL background removal can't reach)
+
+**Reported:** Adrian said background removal "isn't working" for his
+"Fantastic Four Marvel Legends Spider-Man" figure. Also confirmed in this
+same pass, since he asked directly: editing an existing figure goes
+through the exact same form/fields as adding one, so background removal
+(both upload-and-crop and the pasted-URL path) already worked identically
+there — nothing to build, just verified it live and canceled out without
+saving so his real data wasn't touched.
+
+**Found:** that figure's cover image is hosted on
+`images.bigbadtoystore.com`, which refuses a `crossOrigin="anonymous"`
+request outright (unlike the Hasbro/Amplience CDN tested in the previous
+entry, which allows it) — the `<img>` never loads at all, so `onload`
+never fires. `attemptUrlBackgroundRemoval`'s `onerror` handler was an
+empty no-op ("leave it to the existing broken-image handling elsewhere"),
+so the "Yes, remove it" choice silently did nothing: no message, no
+change, which reads as broken rather than as the known "some hosts don't
+allow this" limitation already called out elsewhere in the code and the
+in-app hint.
+
+**Fixed:** `onerror` now shows the same "Couldn't remove the background
+from that URL (the image's host doesn't allow it) — using it as-is."
+message the getImageData-taint path already used, instead of failing
+silently. The pasted URL itself was never touched either way (processing
+only ever replaces it on success), so Adrian's real item wasn't affected
+by the original bug — this only fixes the missing feedback.
+
+**Verified:** reproduced the exact silent failure against the real
+`bigbadtoystore.com` URL from his actual figure, confirmed the request
+fails under `crossOrigin="anonymous"`, applied the fix, and reran the
+same URL through the real form (Yes, remove it) — now shows the
+can't-do-this-one message instead of nothing happening.
