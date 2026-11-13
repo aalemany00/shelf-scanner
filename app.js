@@ -183,6 +183,7 @@
     el.coverLivePreview = document.getElementById("coverLivePreview");
     el.coverCropApplyBtn = document.getElementById("coverCropApplyBtn");
     el.coverCropCancelBtn = document.getElementById("coverCropCancelBtn");
+    el.coverBgRemoveHint = document.getElementById("coverBgRemoveHint");
     el.notesInput = document.getElementById("notesInput");
     el.manualDuplicateWarning = document.getElementById("manualDuplicateWarning");
     el.manualSubKindRow = document.getElementById("manualSubKindRow");
@@ -1533,6 +1534,7 @@
     el.manualForm.classList.remove("hidden");
     el.manualSubKindRow.classList.toggle("hidden", state.category !== "book");
     el.authorInput.classList.toggle("hidden", state.category !== "book");
+    el.coverBgRemoveHint.classList.toggle("hidden", state.category !== "figure");
     el.titleInput.focus();
   }
 
@@ -1864,7 +1866,10 @@
   // Draws just the [start, end] horizontal slice (full height, the same
   // crop shape as the spine tool) onto an offscreen canvas at native
   // resolution, uploads that as a new file, and fills the Cover image URL
-  // field with the result.
+  // field with the result. For Figures specifically, also strips the
+  // photo's background first (see removeBackgroundAndAutocrop below) so a
+  // figure dropped onto the display-case shelf floats over its own pedestal
+  // shadow instead of carrying its original backdrop.
   function applyCoverCrop() {
     var start = Number(el.coverCropStartInput.value);
     var end = Number(el.coverCropEndInput.value);
@@ -1880,13 +1885,19 @@
       0, 0, end - start, coverCropState.naturalHeight
     );
 
+    var isFigure = state.category === "figure";
+    if (isFigure) {
+      canvas = downscaleCanvas(canvas, 1200);
+      canvas = removeBackgroundAndAutocrop(canvas);
+    }
+
     el.coverUploadStatus.textContent = "Uploading…";
     canvas.toBlob(function (blob) {
       if (!blob) {
         el.coverUploadStatus.textContent = "Couldn't process that image.";
         return;
       }
-      uploadBlobToWorker(blob, "cover.jpg")
+      uploadBlobToWorker(blob, isFigure ? "cover.png" : "cover.jpg")
         .then(function (url) {
           el.imageInput.value = url;
           el.coverUploadStatus.textContent = "Uploaded.";
@@ -1895,7 +1906,135 @@
         .catch(function (err) {
           el.coverUploadStatus.textContent = "Upload failed: " + err.message;
         });
-    }, "image/jpeg", 0.92);
+    }, isFigure ? "image/png" : "image/jpeg", 0.92);
+  }
+
+  // ---------- figures: automatic background removal on cover upload ----------
+  // Scoped to Figures only — other categories' cover art (a VHS box, a game
+  // box, a book cover) is supposed to show its real background, so only a
+  // figure photo gets this treatment. No ML model, no paid API: flood-fills
+  // inward from the image's four edges, removing any region of connected,
+  // similar-enough color. That covers the common case (a product photo shot
+  // on a plain/near-uniform backdrop — white, black, gray seamless paper)
+  // without downloading anything. A busy/photographic background (a real
+  // room, a cluttered desk) won't fully disappear, since it isn't one
+  // connected tone — there's no ML segmentation behind this.
+
+  var BG_REMOVE_COLOR_TOLERANCE = 28; // Euclidean RGB distance between adjacent pixels
+
+  function downscaleCanvas(canvas, maxDim) {
+    var longest = Math.max(canvas.width, canvas.height);
+    if (longest <= maxDim) return canvas;
+    var scale = maxDim / longest;
+    var out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(canvas.width * scale));
+    out.height = Math.max(1, Math.round(canvas.height * scale));
+    out.getContext("2d").drawImage(canvas, 0, 0, out.width, out.height);
+    return out;
+  }
+
+  function removeBackgroundAndAutocrop(canvas) {
+    var w = canvas.width, h = canvas.height;
+    if (!w || !h) return canvas;
+    var ctx = canvas.getContext("2d");
+    var imageData = ctx.getImageData(0, 0, w, h);
+    var data = imageData.data;
+
+    var visited = new Uint8Array(w * h);
+    var queue = new Int32Array(w * h);
+    var qHead = 0, qTail = 0;
+
+    function idx(x, y) { return y * w + x; }
+    function colorDist(i1, i2) {
+      var dr = data[i1 * 4] - data[i2 * 4];
+      var dg = data[i1 * 4 + 1] - data[i2 * 4 + 1];
+      var db = data[i1 * 4 + 2] - data[i2 * 4 + 2];
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+    function pushSeed(x, y) {
+      var i = idx(x, y);
+      if (!visited[i]) { visited[i] = 1; queue[qTail++] = i; }
+    }
+    for (var sx = 0; sx < w; sx++) { pushSeed(sx, 0); pushSeed(sx, h - 1); }
+    for (var sy = 0; sy < h; sy++) { pushSeed(0, sy); pushSeed(w - 1, sy); }
+
+    // Flood fill from every border pixel, spreading through neighbors whose
+    // color is close to the pixel that reached them (not a single global
+    // seed color) — tolerates the slight lighting gradient a real product
+    // photo's backdrop usually has, while still stopping at the figure's
+    // actual edge.
+    var removed = new Uint8Array(w * h);
+    while (qHead < qTail) {
+      var i = queue[qHead++];
+      removed[i] = 1;
+      var x = i % w, y = (i / w) | 0;
+      var nx, ny, ni;
+      if (x > 0) { nx = x - 1; ni = idx(nx, y); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+      if (x < w - 1) { nx = x + 1; ni = idx(nx, y); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+      if (y > 0) { ny = y - 1; ni = idx(x, ny); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+      if (y < h - 1) { ny = y + 1; ni = idx(x, ny); if (!visited[ni] && colorDist(i, ni) <= BG_REMOVE_COLOR_TOLERANCE) { visited[ni] = 1; queue[qTail++] = ni; } }
+    }
+
+    var minX = w, minY = h, maxX = -1, maxY = -1;
+    for (var py = 0; py < h; py++) {
+      for (var px = 0; px < w; px++) {
+        var pi = idx(px, py);
+        if (removed[pi]) {
+          data[pi * 4 + 3] = 0;
+        } else {
+          if (px < minX) minX = px;
+          if (px > maxX) maxX = px;
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+        }
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    if (maxX < minX || maxY < minY) return canvas; // nothing survived — bail out untouched
+
+    featherAlphaEdges(ctx, w, h);
+
+    // Trim to the bounding box of what's left (plus a little breathing
+    // room) so the figure isn't floating in a big transparent margin.
+    var pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.03);
+    var cropX = Math.max(0, minX - pad);
+    var cropY = Math.max(0, minY - pad);
+    var cropW = Math.min(w, maxX + pad + 1) - cropX;
+    var cropH = Math.min(h, maxY + pad + 1) - cropY;
+
+    var trimmed = document.createElement("canvas");
+    trimmed.width = cropW;
+    trimmed.height = cropH;
+    trimmed.getContext("2d").drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    return trimmed;
+  }
+
+  // Softens the cut silhouette with a single 3x3 box blur over the alpha
+  // channel only (color is untouched) — without it the removed/kept
+  // boundary is a hard, slightly jagged edge.
+  function featherAlphaEdges(ctx, w, h) {
+    var imageData = ctx.getImageData(0, 0, w, h);
+    var data = imageData.data;
+    var alphaCopy = new Uint8ClampedArray(w * h);
+    for (var i = 0; i < w * h; i++) alphaCopy[i] = data[i * 4 + 3];
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var sum = 0, count = 0;
+        for (var dy = -1; dy <= 1; dy++) {
+          var ny = y + dy;
+          if (ny < 0 || ny >= h) continue;
+          for (var dx = -1; dx <= 1; dx++) {
+            var nx = x + dx;
+            if (nx < 0 || nx >= w) continue;
+            sum += alphaCopy[ny * w + nx];
+            count++;
+          }
+        }
+        data[(y * w + x) * 4 + 3] = Math.round(sum / count);
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
   }
 
   // ---------- title search ----------

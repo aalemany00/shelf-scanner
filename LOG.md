@@ -904,3 +904,60 @@ disappeared again once the real count dropped back to one shelf.
 - Figures is the only category using this carousel so far — Games/Books/
   Movies use the horizontal scrolling shelf row instead, which doesn't
   have the same "how many rows is too many" problem Figures does.
+
+## 2026-11-12 (figures cover upload: automatic background removal)
+
+**Planned:** Adrian wants a figure photo with its own background (a product
+shot with a white/plain backdrop, say) to show up on the shelf as just the
+figure, not a box with the photo's background still inside it. Asked me to
+pick an approach given the "no paid services" constraint — real ML
+background-removal (free, open-source, runs client-side via WASM, but
+downloads a model file and takes a few seconds) vs. a lighter edge-detect
+flood-fill (instant, zero downloads, only handles a fairly uniform
+backdrop). He picked the flood-fill approach.
+
+**Built:** scoped to the existing Figures cover-upload-and-crop flow only
+(`applyCoverCrop` in `app.js`) — other categories' cover art is supposed to
+show its real background (a VHS box, a game box), so this never runs for
+them:
+- `removeBackgroundAndAutocrop`: flood-fills inward from all four edges of
+  the uploaded photo, spreading through neighboring pixels within a color
+  tolerance of whatever pixel reached them (not one fixed seed color, so it
+  tolerates a slight lighting gradient across the backdrop) — same idea as
+  a "magic wand, contiguous" selection tool, done manually over
+  `ImageData`. Matched pixels get `alpha = 0`.
+- `featherAlphaEdges`: one 3x3 box blur over the alpha channel only (color
+  untouched), so the cut silhouette isn't a hard jagged edge.
+- Result is trimmed to the bounding box of whatever's left (plus ~3%
+  padding), so the figure isn't floating in a big transparent margin —
+  same autocrop idea, just on alpha instead of a fixed pixel range.
+- `downscaleCanvas` caps the working image at 1200px on the long edge
+  before any of this runs, since the final use is a small shelf thumbnail
+  and flood-filling a full-resolution phone photo pixel-by-pixel in the
+  browser has no reason to be that expensive.
+- Output switches to PNG (`image/png`, uploaded as `cover.png`) instead of
+  the existing JPEG path, since the whole point is the transparency —
+  JPEG has no alpha channel. Non-figure categories are untouched (still
+  JPEG, still no background processing).
+- Added a hint line in the upload panel, shown only when adding/editing a
+  Figure, explaining that the background comes off automatically and that
+  a busy/photographic background won't fully disappear (there's no ML
+  segmentation behind this, just color-based flood fill).
+
+**Verified:** ran it against a synthetic test image (a red/blue shape on a
+plain white background, built in-browser rather than needing a real figure
+photo) through the real upload-and-crop flow. Downloaded the actual
+resulting hosted PNG and confirmed the white background was gone
+(transparent) and the image was trimmed tight to the shape. Added it as a
+real item on the real Figures shelf and confirmed it rendered sitting on
+its pedestal shadow with no background box around it, same as a real
+figure — then deleted the test item.
+
+**Open items:**
+- This only runs for the upload-and-crop path, not a pasted "Cover image
+  URL" — same cross-origin-canvas-taint reason the crop tool itself is
+  upload-only (see the comment above `applyCoverCrop`).
+- A photographic/busy background (a real desk, a shelf behind the figure)
+  won't be fully removed, since flood fill only catches one connected
+  near-uniform region — flagged to Adrian up front, and in the in-app
+  hint, rather than silently producing a bad result.
