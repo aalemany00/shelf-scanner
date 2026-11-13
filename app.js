@@ -1254,6 +1254,37 @@
     });
   }
 
+  // The column count above is only ever right until the window's actual
+  // width changes — going fullscreen, leaving fullscreen, snapping into a
+  // split view, resizing the split — all of which can happen well after
+  // that one requestAnimationFrame already measured and fixed a now-stale
+  // column count. A stale *undercount* makes it paginate early (too few
+  // rows before it rotates to another "shelf"); a stale *overcount* makes
+  // the real per-page item count no longer fit in the fixed 4-row-tall
+  // case, so the extra figures spill out past its bottom edge instead of
+  // rotating to a second shelf. Recomputing on resize fixes both. Debounced
+  // since a window resize/split-view drag fires this continuously.
+  var figureResizeDebounce = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(figureResizeDebounce);
+    figureResizeDebounce = setTimeout(syncFigureCaseToCurrentWidth, 150);
+  });
+
+  function syncFigureCaseToCurrentWidth() {
+    var rotor = figuresCaseState.rotor;
+    if (!rotor || !rotor.isConnected) return; // not on the Figures tab right now
+    var frontFace = figuresCaseState.faces[figuresCaseState.frontFace];
+    if (!frontFace) return;
+    var newColumns = countGridColumns(frontFace);
+    if (newColumns === figuresCaseState.columns) return;
+    figuresCaseState.columns = newColumns;
+    var pageCount = Math.max(1, Math.ceil(figuresCaseState.items.length / figuresPerPage()));
+    if (figuresCaseState.page >= pageCount) figuresCaseState.page = pageCount - 1;
+    fillFigureFace(frontFace, figuresCaseState.page);
+    var glass = rotor.closest(".glass-case");
+    if (glass) updateCaseDots(glass);
+  }
+
   // ---------- comics: the long-box ----------
   // Shows every owned issue (flattened across series — not grouped), fanned
   // out like a real comic-box browsing session: the card nearest the

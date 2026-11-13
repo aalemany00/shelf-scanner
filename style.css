@@ -851,11 +851,23 @@ img { max-width: 100%; }
 .figures-carousel {
   position: relative;
   z-index: 1;
-  perspective: 1400px;
-  /* 4 rows worth of figure-item height (132px art + 8px padding + 6px
-     border-bottom), so the case is a fixed size no matter how many shelves
-     the collection has grown into. */
-  height: calc(4 * 150px);
+  /* Large relative to the faces' translateZ(90px) below (see .figures-face-a/-b) —
+     a closer perspective exaggerates the standard flip-card technique's
+     side effect of visually enlarging the translateZ'd face (scale factor
+     is perspective / (perspective - translateZ)), which at a closer value
+     like 1400px bled the whole grid ~7% past the case's edges on every
+     side. This keeps the same translateZ separation (needed so the two
+     faces don't z-fight mid-rotation) while keeping that bulge down to a
+     couple of imperceptible pixels. */
+  perspective: 6000px;
+  /* 4 rows worth of figure-item height (132px art, plus its padding,
+     border and the inline <img>'s own small baseline gap — 160px measured
+     in practice, not exactly the sum of the box model values below), so
+     the case is a fixed size no matter how many shelves the collection
+     has grown into. A few px short here clips the bottom row's shelf
+     floor right at the case's edge instead of actually losing any
+     figures, but there's no reason to cut it that close. */
+  height: calc(4 * 160px);
 }
 .figures-rotor {
   position: absolute;

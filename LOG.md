@@ -1076,3 +1076,53 @@ by the original bug — this only fixes the missing feedback.
 fails under `crossOrigin="anonymous"`, applied the fix, and reran the
 same URL through the real form (Yes, remove it) — now shows the
 can't-do-this-one message instead of nothing happening.
+
+## 2026-11-12 (fix: figures case breaks on fullscreen/split-view resize)
+
+**Reported:** Adrian saw the Figures case misbehave when switching between
+fullscreen and a split-screen window on desktop — in fullscreen it
+paginated after only 2 rows (too early), and back in split-screen the
+figures spilled out past the bottom of the case onto the page behind it
+(screenshot showed 2 rows of figures floating below the case, overlapping
+the footer text).
+
+**Found (the real bug):** `figuresCaseState.columns` was only ever
+measured once, in a `requestAnimationFrame` right after `renderFiguresCase`
+builds the case. Switching into/out of fullscreen or resizing a split view
+changes the case's actual rendered width well after that one measurement,
+so `figuresPerPage()` (columns × 4 rows) kept using a stale column count:
+too low → paginates after fewer real rows than actually fit; too high →
+tries to fit more figures on one "shelf" than 4 real rows have room for,
+and the extra ones render past the case's fixed-height bottom edge instead
+of rotating to a second shelf.
+
+**Fixed:** added a debounced `window resize` listener
+(`syncFigureCaseToCurrentWidth`) that re-measures the actual column count
+whenever it's changed, re-fills the current page at the corrected
+per-page size, and updates the page dots — bails out immediately if the
+Figures case isn't the tab currently showing (checks `rotor.isConnected`).
+
+**Found (a second, smaller bug while verifying the fix):** even after
+recomputing columns correctly, up to 4 items at a narrower width still
+rendered a few px above the case's fixed-height box. Root cause: the 3D
+flip-card technique (`.figures-carousel`'s `perspective: 1400px` combined
+with each face's `translateZ(90px)`) visually enlarges the translated face
+by `perspective / (perspective - translateZ)` — at 1400px that's ~6.9%
+bigger than its own layout box, bleeding symmetrically past every edge of
+the carousel (only visible now because an earlier change had dropped
+`overflow: hidden` from the case, specifically to avoid clipping the card
+mid-rotation). Fixed by raising `perspective` to 6000px — same
+`translateZ(90px)` separation (so the two faces still don't z-fight
+mid-turn), but the bulge this causes drops to a few, now-imperceptible
+pixels. Also bumped the case's assumed per-row height from 150px to a
+measured 160px (figure-item's actual rendered height, not the sum of its
+box-model values on paper) so the bottom row didn't sit flush against the
+case's own fixed-height edge.
+
+**Verified:** reproduced both directions in the real app by emulating a
+narrow width (more pages, items spilling below the case) then a wide one
+(fewer pages, case overflow), confirming the exact failure the screenshot
+showed; after the fix, re-measured actual item/case rects at both widths
+(not just eyeballing a screenshot) — zero items past the case's bottom
+edge at the narrow width, zero at the wide width, and the remaining
+perspective bulge down from ~20px to under 5px.
