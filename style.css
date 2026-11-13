@@ -760,6 +760,7 @@ img { max-width: 100%; }
 .spine-upload-or { font-size: 0.75rem; color: var(--muted); font-weight: 700; }
 .spine-upload-btn { flex: none; padding: 0.4rem 0.7rem; font-size: 0.78rem; cursor: pointer; }
 .spine-upload-status { font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.bg-remove-choice { margin-left: 0.4rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; }
 
 .spine-crop-preview { position: relative; margin-top: 0.4rem; line-height: 0; }
 .spine-crop-preview img { display: block; width: 100%; border-radius: 4px; }
@@ -793,6 +794,7 @@ img { max-width: 100%; }
   .spine { transition: none; }
   .spine:hover, .spine:focus-visible { transform: none; }
   .figures-rotor { transition: none; }
+  .figure-hold-img, .figure-hold-backdrop, .figure-hold-hint { transition: none; }
 }
 
 /* ============================================================
@@ -907,6 +909,45 @@ img { max-width: 100%; }
   border: 1px solid #4a332688;
 }
 .case-dot.active { background: var(--gold, #f8de92); }
+
+/* "Pulling a figure off the shelf" — see openFigureHold in app.js. A
+   cloned <img> animates from the clicked tile's own rect to a big
+   centered one, over a dimming backdrop. */
+.figure-hold-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(10, 8, 10, 0);
+  transition: background 0.35s ease;
+  cursor: pointer;
+}
+.figure-hold-backdrop.show { background: rgba(10, 8, 10, 0.6); }
+.figure-hold-img {
+  position: fixed;
+  z-index: 61;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 28px #000b);
+  cursor: pointer;
+  transition: left 0.4s cubic-bezier(0.22, 0.75, 0.25, 1),
+              top 0.4s cubic-bezier(0.22, 0.75, 0.25, 1),
+              width 0.4s cubic-bezier(0.22, 0.75, 0.25, 1),
+              height 0.4s cubic-bezier(0.22, 0.75, 0.25, 1);
+}
+.figure-hold-hint {
+  position: fixed;
+  left: 0; right: 0; bottom: 6%;
+  z-index: 61;
+  text-align: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-shadow: 0 2px 4px #000c;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.figure-hold-hint.show { opacity: 1; }
+
 .figure-item {
   position: relative;
   display: flex;

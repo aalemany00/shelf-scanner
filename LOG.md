@@ -961,3 +961,84 @@ figure — then deleted the test item.
   won't be fully removed, since flood fill only catches one connected
   near-uniform region — flagged to Adrian up front, and in the in-app
   hint, rather than silently producing a bad result.
+
+## 2026-11-12 (figures: pull-off-shelf interaction, ask before removing background, flood-fill leak fix)
+
+**Planned:** three asks from Adrian in one go:
+1. Clicking a figure should feel like pulling it off the shelf to look at
+   it (zoom toward the viewer), with a second click to actually edit it —
+   not jump straight to the edit panel on the first click.
+2. The "Add real spine art" option doesn't make sense for Figures (a
+   figure has no spine) — remove it for that category only.
+3. Does the automatic background removal from the previous entry run on a
+   pasted Cover image URL, or only an uploaded file?
+
+**Built (1 — pull off the shelf):** `openFigureHold`/`closeFigureHold` in
+`app.js`, a FLIP-style animation: clicking a figure clones its `<img>`
+into a `position: fixed` element sized to the clicked tile's exact rect,
+then animates it (via a CSS transition on `left`/`top`/`width`/`height`)
+to a big centered one over a dimming backdrop, with a "Tap again to edit"
+hint. Clicking the held figure again opens the real edit overlay; clicking
+the backdrop (or Escape) animates it back to its shelf position instead.
+Respects `prefers-reduced-motion` (the move is an instant cut).
+
+**Built (2 — spine art hidden for Figures):** `showManualForm` now hides
+the "+ Add real spine art" toggle (and force-closes the panel) whenever
+`state.category === "figure"`; unchanged for every other category.
+
+**Answered + built (3 — pasted URL):** it did *not* run on a pasted URL
+before this — only the upload-and-crop flow touches a canvas, since a
+canvas drawn from an arbitrary cross-origin URL is usually tainted
+(`getImageData` throws) unless that host happens to send permissive CORS
+headers. Added `attemptUrlBackgroundRemoval`, wired to the Cover image URL
+field's `change` event: tries loading the pasted URL with
+`crossOrigin="anonymous"`, and if the canvas comes back readable, offers
+the same removal; if the host blocks it, says so and leaves the URL as
+typed. (Tested against a real Hasbro/Amplience product-photo CDN URL —
+it allows this, so this path does work for at least some real retailer
+images, not just same-origin uploads.)
+
+**Changed after Adrian's follow-up — background removal is now asked, not
+automatic:** both the upload-and-crop flow and the pasted-URL flow now
+show an inline "Remove this photo's background automatically? [Yes,
+remove it] / [No, keep as-is]" prompt (`askRemoveBackground`) before doing
+anything — reasonable, since not every figure photo has a background to
+strip (some are already a transparent cutout or studio render). Declining
+still uploads/re-hosts as PNG rather than JPEG (a figure photo may already
+be a transparent cutout worth preserving even with removal declined), it
+just skips `removeBackgroundAndAutocrop` entirely.
+
+**Found and fixed while testing with a real figure photo:** the flood
+fill algorithm from the previous entry had a real bug, not just the known
+"busy background" limitation — on a real product photo (a metallic
+Green Goblin figure on a light-gray backdrop), it leaked through the
+figure's own metallic/gray-toned parts and ate most of the character,
+leaving only crisp edge outlines. Root cause: each admission check
+compared a candidate pixel only to the *previous* pixel in the flood-fill
+chain, so a long chain of small shading/gradient steps across the figure
+could drift arbitrarily far from the real background color without ever
+failing a single step — classic "magic wand with tolerance" tunneling.
+Fixed in `removeBackgroundAndAutocrop` by anchoring every candidate to a
+fixed reference color (the average of all border/seed pixels), not just
+the previous step — a pixel is now removed only if it's close to *both*
+the pixel that reached it (tolerates a real gradient across the backdrop)
+*and* the overall background anchor color (stops that from drifting into
+an unrelated tone). Re-tested against the same real photo that leaked
+before: the full figure now renders intact with the background actually
+gone (confirmed by reading pixel alpha values directly, not just eyeballing
+a screenshot — some image viewers render transparency as flat gray/white
+rather than a checkerboard, which looked like a failure at first glance
+but wasn't).
+
+**Verified:** all three, end-to-end, through the real app — a synthetic
+test item added, the hold/zoom/edit click sequence exercised both ways
+(edit-open and cancel-back-to-shelf), the spine toggle confirmed hidden
+for Figures and still present for Books & Manga, and the pasted-URL
+background removal re-tested against the real Hasbro CDN photo that had
+previously leaked (now renders as an intact, fully transparent cutout).
+Test item deleted afterward.
+
+**Open items:**
+- The "ask first" prompt is plain inline buttons, not a modal — if Adrian
+  adds a second Figures-only prompt later, revisit whether `askRemoveBackground`
+  should become a small reusable dialog instead of one-off DOM nodes.
