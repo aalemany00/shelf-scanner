@@ -792,6 +792,7 @@ img { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .spine { transition: none; }
   .spine:hover, .spine:focus-visible { transform: none; }
+  .figures-rotor { transition: none; }
 }
 
 /* ============================================================
@@ -824,12 +825,10 @@ img { max-width: 100%; }
    ============================================================ */
 .glass-case {
   position: relative;
-  min-height: 260px;
   background: linear-gradient(110deg, #352c2d, #684331 48%, #3e3030);
   border: 6px ridge #8c573a;
   box-shadow: inset 0 0 0 5px #201b22, 0 4px #1d1c23;
-  overflow: hidden;
-  padding: 10px;
+  padding: 10px 34px 26px;
 }
 .glass-case:before {
   content: "";
@@ -847,13 +846,67 @@ img { max-width: 100%; }
     radial-gradient(ellipse at 84% 0, #ffe5acb3, transparent 36%);
   filter: blur(4px);
 }
+.figures-carousel {
+  position: relative;
+  z-index: 1;
+  perspective: 1400px;
+  /* 4 rows worth of figure-item height (132px art + 8px padding + 6px
+     border-bottom), so the case is a fixed size no matter how many shelves
+     the collection has grown into. */
+  height: calc(4 * 150px);
+}
+.figures-rotor {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.45, 0.05, 0.35, 1);
+}
+.figures-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  align-content: start;
+}
+.figures-face-a { transform: rotateY(0deg) translateZ(90px); }
+.figures-face-b { transform: rotateY(180deg) translateZ(90px); }
 .figures-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 0;
-  position: relative;
-  z-index: 1;
 }
+.case-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 30px; height: 30px;
+  margin-top: -15px;
+  border-radius: 50%;
+  border: 2px solid #8c573a;
+  background: var(--cream);
+  color: var(--ink);
+  font-weight: 900;
+  font-size: 1rem;
+  line-height: 1;
+  box-shadow: 0 2px 4px #0008;
+}
+.case-nav.prev { left: 2px; }
+.case-nav.next { right: 2px; }
+.case-dots {
+  position: absolute;
+  left: 0; right: 0; bottom: 6px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.case-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #cfa26a66;
+  border: 1px solid #4a332688;
+}
+.case-dot.active { background: var(--gold, #f8de92); }
 .figure-item {
   position: relative;
   display: flex;

@@ -856,3 +856,51 @@ synthetic test file afterward.
   Adrian was manually dropping files in) — now redundant since cover/spine
   art goes through imgbb instead. Left it for Adrian to delete himself
   since he put it there.
+
+## 2026-11-12 (figures case: rotating shelves instead of growing taller)
+
+**Planned:** Adrian had populated the Figures case with real figures and
+asked for pagination once a shelf fills past 4 rows — flipping to the next
+page should animate like a real rotating display cabinet, not just swap
+the grid.
+
+**Built:** `renderFiguresCase` in `app.js` now paginates into "shelves" of
+`columns × 4 rows` and spins between them with a CSS 3D transform:
+- Two fixed DOM faces (`.figures-face-a`/`-b`) sit back-to-back inside a
+  `.figures-rotor` (`transform-style: preserve-3d`, `backface-visibility:
+  hidden`) inside a `.figures-carousel` with `perspective` set — a
+  standard flip-card technique, just applied to a whole grid of figures
+  instead of one card.
+- Clicking the new `‹`/`›` case-nav buttons renders the target shelf into
+  whichever face is currently hidden, then rotates the rotor 180°,
+  bringing that face to the front — same illusion as a lazy-Susan display
+  case turning to its next face.
+- Columns-per-row is measured from the actual rendered grid (`getComputedStyle(...).gridTemplateColumns`)
+  rather than assumed, since the grid is still responsive
+  (`auto-fill`/`minmax`) — so "4 rows" means 4 real rows at whatever width
+  the case is actually rendered at, recalculated on each render.
+- Rotation wraps around (last shelf → first) and the stored rotation angle
+  is normalized back into `0–360°` after each flip (mod-360 snap with the
+  transition briefly disabled) so a long session of flipping back and
+  forth never drifts into huge transform values.
+- Nav arrows and the page-dot indicator only render when there's more than
+  one shelf — a collection that fits on one shelf looks exactly like
+  before.
+- Respects `prefers-reduced-motion`: the rotor transition is disabled,
+  so a flip is an instant cut instead of a spin.
+- Added `.claude/launch.json` (a plain `python -m http.server`) so this
+  static, no-build site can be previewed locally through the Browser pane
+  without touching the deployed `master` site.
+
+**Verified:** ran the real app locally (synced to the real Firestore data,
+19 real figures — not enough on its own to paginate). Added 5 throwaway
+manually-entered items ("ZTEST FIGURE ...") to push the count past one
+shelf's worth, confirmed the nav arrows and page dots appeared, clicked
+`›` and watched the case spin to the second shelf and `‹` to spin back,
+then deleted all 5 test items afterward and confirmed the nav/dots
+disappeared again once the real count dropped back to one shelf.
+
+**Open items:**
+- Figures is the only category using this carousel so far — Games/Books/
+  Movies use the horizontal scrolling shelf row instead, which doesn't
+  have the same "how many rows is too many" problem Figures does.

@@ -997,8 +997,106 @@
   }
 
   // ---------- figures: a lit glass display case ----------
+  // Once a shelf fills past FIGURE_ROWS_PER_PAGE rows, the rest become a
+  // second (third, ...) "shelf" the case rotates to, like a real rotating
+  // display cabinet, instead of growing the case taller forever. Two fixed
+  // DOM faces (figures-face-a/b) sit back-to-back inside a 3D rotor; moving
+  // to another shelf renders that page into whichever face is currently
+  // hidden, then spins the rotor 180° to bring it to the front.
+
+  var FIGURE_ROWS_PER_PAGE = 4;
+  var figuresCaseState = {
+    items: [], page: 0, columns: 1, rotation: 0,
+    rotor: null, faces: [null, null], frontFace: 0, animating: false
+  };
+
+  function countGridColumns(gridEl) {
+    var cols = getComputedStyle(gridEl).gridTemplateColumns.split(" ").filter(Boolean);
+    return cols.length || 1;
+  }
+
+  function figuresPerPage() {
+    return Math.max(1, figuresCaseState.columns) * FIGURE_ROWS_PER_PAGE;
+  }
+
+  function buildFigureItem(item) {
+    var fig = document.createElement("button");
+    fig.type = "button";
+    fig.className = "figure-item";
+    fig.setAttribute("aria-label", item.title || "Figure");
+    fig.innerHTML = '<img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">';
+    fig.addEventListener("click", function () { showItemOverlay(item); });
+    return fig;
+  }
+
+  function fillFigureFace(face, pageIndex) {
+    var items = figuresCaseState.items;
+    var perPage = figuresPerPage();
+    face.innerHTML = "";
+    if (!items.length) {
+      face.appendChild(text("div", "empty-on-shelf", "THE CASE IS EMPTY"));
+      return;
+    }
+    items.slice(pageIndex * perPage, pageIndex * perPage + perPage)
+      .forEach(function (item) { face.appendChild(buildFigureItem(item)); });
+  }
+
+  function updateCaseDots(glass) {
+    var dotsEl = glass.querySelector(".case-dots");
+    var navBtns = glass.querySelectorAll(".case-nav");
+    if (!dotsEl) return;
+    var pageCount = Math.max(1, Math.ceil(figuresCaseState.items.length / figuresPerPage()));
+    dotsEl.innerHTML = "";
+    var multiPage = pageCount > 1;
+    navBtns.forEach(function (btn) { btn.style.display = multiPage ? "" : "none"; });
+    if (!multiPage) return;
+    for (var i = 0; i < pageCount; i++) {
+      var dot = document.createElement("span");
+      dot.className = "case-dot" + (i === figuresCaseState.page ? " active" : "");
+      dotsEl.appendChild(dot);
+    }
+  }
+
+  function rotateFiguresCase(direction) {
+    var glass = figuresCaseState.rotor.closest(".glass-case");
+    var items = figuresCaseState.items;
+    var pageCount = Math.max(1, Math.ceil(items.length / figuresPerPage()));
+    if (figuresCaseState.animating || pageCount <= 1) return;
+
+    var nextPage = ((figuresCaseState.page + direction) % pageCount + pageCount) % pageCount;
+    var backFaceIndex = figuresCaseState.frontFace === 0 ? 1 : 0;
+    fillFigureFace(figuresCaseState.faces[backFaceIndex], nextPage);
+
+    figuresCaseState.animating = true;
+    figuresCaseState.rotation += direction * 180;
+    figuresCaseState.rotor.style.transform = "rotateY(" + figuresCaseState.rotation + "deg)";
+    figuresCaseState.page = nextPage;
+    figuresCaseState.frontFace = backFaceIndex;
+    updateCaseDots(glass);
+
+    var rotor = figuresCaseState.rotor;
+    function onEnd(e) {
+      if (e.target !== rotor || e.propertyName !== "transform") return;
+      rotor.removeEventListener("transitionend", onEnd);
+      figuresCaseState.animating = false;
+      // Keep the rotation value bounded (±180/360 is visually identical to
+      // 0/180) so a long session of flipping back and forth never drifts
+      // into huge transform values.
+      var normalized = ((figuresCaseState.rotation % 360) + 360) % 360;
+      if (normalized !== figuresCaseState.rotation) {
+        rotor.style.transition = "none";
+        figuresCaseState.rotation = normalized;
+        rotor.style.transform = "rotateY(" + normalized + "deg)";
+        void rotor.offsetWidth; // force reflow before re-enabling the transition
+        rotor.style.transition = "";
+      }
+    }
+    rotor.addEventListener("transitionend", onEnd);
+  }
 
   function renderFiguresCase(container, items) {
+    figuresCaseState.items = items;
+
     var glass = document.createElement("div");
     glass.className = "glass-case";
 
@@ -1006,24 +1104,57 @@
     light.className = "cabinet-light";
     glass.appendChild(light);
 
-    var grid = document.createElement("div");
-    grid.className = "figures-grid";
-    items.forEach(function (item) {
-      var fig = document.createElement("button");
-      fig.type = "button";
-      fig.className = "figure-item";
-      fig.setAttribute("aria-label", item.title || "Figure");
-      fig.innerHTML = '<img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">';
-      fig.addEventListener("click", function () { showItemOverlay(item); });
-      grid.appendChild(fig);
-    });
-    glass.appendChild(grid);
+    var carousel = document.createElement("div");
+    carousel.className = "figures-carousel";
+    var rotor = document.createElement("div");
+    rotor.className = "figures-rotor";
+    var faceA = document.createElement("div");
+    faceA.className = "figures-face figures-grid figures-face-a";
+    var faceB = document.createElement("div");
+    faceB.className = "figures-face figures-grid figures-face-b";
+    rotor.append(faceA, faceB);
+    carousel.appendChild(rotor);
+    glass.appendChild(carousel);
 
     var reflection = document.createElement("div");
     reflection.className = "glass-reflection";
     glass.appendChild(reflection);
 
+    var prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "case-nav prev";
+    prevBtn.setAttribute("aria-label", "Rotate case to the previous shelf");
+    prevBtn.textContent = "‹";
+    prevBtn.addEventListener("click", function () { rotateFiguresCase(-1); });
+    var nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "case-nav next";
+    nextBtn.setAttribute("aria-label", "Rotate case to the next shelf");
+    nextBtn.textContent = "›";
+    nextBtn.addEventListener("click", function () { rotateFiguresCase(1); });
+    glass.append(prevBtn, nextBtn);
+
+    var dots = document.createElement("div");
+    dots.className = "case-dots";
+    glass.appendChild(dots);
+
     container.appendChild(glass);
+
+    figuresCaseState.rotor = rotor;
+    figuresCaseState.faces = [faceA, faceB];
+    figuresCaseState.frontFace = 0;
+    figuresCaseState.rotation = 0;
+    rotor.style.transform = "rotateY(0deg)";
+
+    // Column count depends on the case's actual rendered width, so measure
+    // once it's laid out, then clamp the remembered page and fill face A.
+    requestAnimationFrame(function () {
+      figuresCaseState.columns = countGridColumns(faceA);
+      var pageCount = Math.max(1, Math.ceil(items.length / figuresPerPage()));
+      if (figuresCaseState.page >= pageCount) figuresCaseState.page = pageCount - 1;
+      fillFigureFace(faceA, figuresCaseState.page);
+      updateCaseDots(glass);
+    });
   }
 
   // ---------- comics: the long-box ----------
