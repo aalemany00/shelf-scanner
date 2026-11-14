@@ -540,22 +540,7 @@ img { max-width: 100%; }
   font-family: inherit;
 }
 
-/* Flat grid (Figures fallback / nothing-found states) */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 0.7rem; }
-.grid-item {
-  position: relative;
-  background: var(--cream);
-  border: 2.5px solid var(--border);
-  border-radius: 7px;
-  overflow: hidden;
-  cursor: pointer;
-  text-align: left;
-  padding: 0;
-  color: var(--text);
-  box-shadow: 3px 3px 0 var(--border);
-}
-.grid-item img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: var(--paper); display: block; }
-.grid-item .label { padding: 0.35rem 0.45rem; font-size: 0.7rem; font-weight: 700; line-height: 1.2; background: var(--ink); color: #fff; text-align: center; }
 
 .empty-msg { color: var(--gold); font-size: 0.88rem; }
 
@@ -578,6 +563,7 @@ img { max-width: 100%; }
 .overlay-card h3 { margin: 0 0 0.3rem; font: 20px Impact, sans-serif; color: var(--red-dark); letter-spacing: 0.5px; }
 .overlay-card p { color: var(--muted); font-size: 0.84rem; margin: 0.2rem 0; }
 .overlay-card .form-actions { justify-content: center; }
+.delete-confirm-text { flex-basis: 100%; text-align: center; color: var(--red-dark); font-weight: 700; font-size: 0.82rem; margin-bottom: 0.3rem; }
 
 .status-row { display: flex; gap: 0.4rem; justify-content: center; margin: 0.55rem 0; flex-wrap: wrap; }
 .confirm-info .status-row { justify-content: flex-start; }
@@ -593,16 +579,6 @@ img { max-width: 100%; }
 .status-chip.active[data-status="have"] { background: var(--red); border-color: var(--red-dark); color: #fff; }
 .status-chip.active[data-status="want"] { background: var(--gold); border-color: var(--border); color: var(--ink); }
 .status-chip.active[data-status="read"] { background: var(--blue); border-color: var(--border); color: #fff; }
-
-.series-card { max-width: 480px; text-align: left; }
-.series-card h3 { text-align: center; margin-bottom: 0.7rem; }
-.series-card .grid { max-height: 50vh; overflow-y: auto; }
-.series-tile .badge {
-  position: absolute; top: 0.3rem; right: 0.3rem;
-  background: var(--gold); color: var(--ink);
-  font-size: 0.68rem; font-weight: 800;
-  padding: 0.1rem 0.4rem; border: 2px solid var(--border); border-radius: 999px;
-}
 
 .status-dot { position: absolute; top: 0.3rem; left: 0.3rem; display: flex; gap: 0.2rem; }
 .status-dot span { width: 0.5rem; height: 0.5rem; border-radius: 50%; display: block; border: 1.5px solid var(--border); }
@@ -945,6 +921,7 @@ img { max-width: 100%; }
               width 0.4s cubic-bezier(0.22, 0.75, 0.25, 1),
               height 0.4s cubic-bezier(0.22, 0.75, 0.25, 1);
 }
+.figure-hold-img:focus-visible { outline: 3px solid var(--gold, #f8de92); outline-offset: 4px; }
 .figure-hold-hint {
   position: fixed;
   left: 0; right: 0; bottom: 6%;

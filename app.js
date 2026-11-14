@@ -38,7 +38,6 @@
     pendingMatch: null, // the item waiting in the confirm panel
     pendingStatus: null, // {have, want, read} being edited in the confirm panel
     pendingSubKind: null, // "book" or "manga" being edited in the confirm panel
-    seriesOverlaySeries: null, // the series currently open in the drill-down overlay
     comicStatusFilter: "have", // which shelf (Have/Want/Read) is showing, for any WITH_SHELVES category
     collectionSearch: "", // filters the currently-displayed grid, lowercased
     editingId: null, // set while the manual form is editing an already-saved item, see editItemBtn
@@ -221,10 +220,11 @@
     el.editItemBtn = document.getElementById("editItemBtn");
     el.moveItemBtn = document.getElementById("moveItemBtn");
     el.closeItemBtn = document.getElementById("closeItemBtn");
-    el.seriesOverlay = document.getElementById("seriesOverlay");
-    el.seriesOverlayTitle = document.getElementById("seriesOverlayTitle");
-    el.seriesOverlayGrid = document.getElementById("seriesOverlayGrid");
-    el.closeSeriesBtn = document.getElementById("closeSeriesBtn");
+    el.itemActionsRow = document.getElementById("itemActionsRow");
+    el.deleteConfirmRow = document.getElementById("deleteConfirmRow");
+    el.deleteConfirmText = document.getElementById("deleteConfirmText");
+    el.deleteConfirmBtn = document.getElementById("deleteConfirmBtn");
+    el.deleteCancelBtn = document.getElementById("deleteCancelBtn");
     el.attribution = document.getElementById("attribution");
     el.syncStatus = document.getElementById("syncStatus");
   }
@@ -377,7 +377,22 @@
       renderGrid();
       if (window.ShelfSync) window.ShelfSync.setItem(item).catch(function () {});
     });
+    // Removing is permanent (synced across devices, no trash/undo anywhere
+    // in this app) — a single misclick on a real collection item shouldn't
+    // be able to lose it, so this asks first instead of deleting
+    // immediately. Swaps the row in place rather than a native confirm()
+    // dialog, to stay inside the app's own styling.
     el.deleteItemBtn.addEventListener("click", function () {
+      var item = findItemById(el.itemOverlay.dataset.id);
+      el.deleteConfirmText.textContent = "Remove \"" + (item ? item.title : "this item") + "\"? This can't be undone.";
+      el.itemActionsRow.classList.add("hidden");
+      el.deleteConfirmRow.classList.remove("hidden");
+    });
+    el.deleteCancelBtn.addEventListener("click", function () {
+      el.deleteConfirmRow.classList.add("hidden");
+      el.itemActionsRow.classList.remove("hidden");
+    });
+    el.deleteConfirmBtn.addEventListener("click", function () {
       var id = el.itemOverlay.dataset.id;
       state.items = state.items.filter(function (it) { return it.id !== id; });
       saveItems();
@@ -391,11 +406,12 @@
         pendingWrites[id] = "delete";
         window.ShelfSync.deleteItem(id)
           .then(function () { delete pendingWrites[id]; })
-          .catch(function () { delete pendingWrites[id]; });
+          .catch(function () {
+            delete pendingWrites[id];
+            setStatus("Removed here, but couldn't sync the delete to your other devices — it may come back until you're back online.");
+          });
       }
     });
-
-    el.closeSeriesBtn.addEventListener("click", hideSeriesOverlay);
 
     el.comicStatusTabs.addEventListener("click", function (e) {
       var btn = e.target.closest(".status-tab");
@@ -707,40 +723,6 @@
       el.noMatchMsg.classList.toggle("hidden", !(empty && search));
       renderFiguresCase(el.grid, items);
     }
-  }
-
-  function renderFlatGrid(container, items, onClick) {
-    items.slice().reverse().forEach(function (item) {
-      container.appendChild(buildGridTile(item.image, item.title, statusDotsHtml(item), function () {
-        onClick(item);
-      }));
-    });
-  }
-
-  // Comics/manga: one tile per series (grouping by seriesName, falling back
-  // to the item's own title for manually-entered items with no series of
-  // their own), with a count badge — not a flat dump of every issue, which
-  // is unreadable once a series has more than a couple of owned issues.
-  function renderSeriesGroupedGrid(container, items) {
-    var bySeries = {};
-    var order = [];
-    items.forEach(function (item) {
-      var key = item.seriesName || item.title;
-      if (!bySeries[key]) {
-        bySeries[key] = [];
-        order.push(key);
-      }
-      bySeries[key].push(item);
-    });
-
-    order.forEach(function (seriesName) {
-      var group = bySeries[seriesName];
-      var cover = group[group.length - 1];
-      var badge = group.length > 1 ? '<span class="badge">' + group.length + "</span>" : "";
-      container.appendChild(buildGridTile(cover.image, seriesName, badge, function () {
-        showSeriesOverlay(seriesName, group);
-      }));
-    });
   }
 
   // Retro collection-room redesign: Books & Manga, Movies, and Games all
@@ -1067,9 +1049,22 @@
     img.style.top = originRect.top + "px";
     img.style.width = originRect.width + "px";
     img.style.height = originRect.height + "px";
+    // Focusable/activatable with the keyboard too, not just a mouse click —
+    // the shelf tile that opened this is a real <button>, but this cloned
+    // <img> isn't interactive by default, so a keyboard user could open the
+    // hold state but never had a way to then confirm "edit" from it.
+    img.tabIndex = 0;
+    img.setAttribute("role", "button");
+    img.setAttribute("aria-label", "Edit " + (item.title || "this figure"));
     img.addEventListener("click", function (e) {
       e.stopPropagation();
       closeFigureHold(true);
+    });
+    img.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        closeFigureHold(true);
+      }
     });
 
     var hint = document.createElement("div");
@@ -1080,6 +1075,7 @@
     document.body.appendChild(img);
     document.body.appendChild(hint);
     figureHoldState = { item: item, backdrop: backdrop, img: img, hint: hint, originRect: originRect };
+    img.focus();
 
     requestAnimationFrame(function () {
       backdrop.classList.add("show");
@@ -1595,38 +1591,12 @@
     }
   }
 
-  function buildGridTile(image, label, overlayHtml, onClick) {
-    var card = document.createElement("button");
-    card.className = "grid-item";
-    card.innerHTML =
-      '<img src="' + (image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
-      (overlayHtml || "") +
-      '<div class="label">' + escapeHtml(label) + "</div>";
-    card.addEventListener("click", onClick);
-    return card;
-  }
-
   function statusDotsHtml(item) {
     if (!item.status) return "";
     var dots = STATUS_KEYS.filter(function (k) { return item.status[k]; })
       .map(function (k) { return '<span class="' + k + '"></span>'; })
       .join("");
     return dots ? '<div class="status-dot">' + dots + "</div>" : "";
-  }
-
-  function showSeriesOverlay(seriesName, items) {
-    state.seriesOverlaySeries = seriesName;
-    el.seriesOverlayTitle.textContent = seriesName;
-    el.seriesOverlayGrid.innerHTML = "";
-    renderFlatGrid(el.seriesOverlayGrid, items, function (item) {
-      hideSeriesOverlay();
-      showItemOverlay(item);
-    });
-    el.seriesOverlay.classList.remove("hidden");
-  }
-
-  function hideSeriesOverlay() {
-    el.seriesOverlay.classList.add("hidden");
   }
 
   function showItemOverlay(item) {
@@ -1644,6 +1614,8 @@
     el.moveItemBtn.classList.toggle("hidden", !swapTo);
     if (swapTo) el.moveItemBtn.textContent = "Move to " + CATEGORY_LABELS[swapTo];
 
+    el.deleteConfirmRow.classList.add("hidden");
+    el.itemActionsRow.classList.remove("hidden");
     el.itemOverlay.classList.remove("hidden");
   }
 

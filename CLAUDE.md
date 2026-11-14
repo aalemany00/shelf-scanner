@@ -6,8 +6,10 @@ searches by title) to catalog a personal collection across 5 categories
 (Games, Figures, Comics, Books & Manga, Movies), synced between phone and
 laptop via Firebase.
 
-**Current focus: a visual redesign**, not new functionality — see
-"Redesign in progress" below. Read `ASSET_LIST.md` before working on it.
+The Japanese retro collection-room redesign (see below) is done and merged
+to `master`. Current focus is iterating on it (figures-case interactions,
+background removal on figure photos, bug fixes) rather than new categories
+or lookup sources.
 
 ## Stack
 
@@ -40,28 +42,38 @@ laptop via Firebase.
   grade (e.g. "A", "B+") and a dedupe check on category + barcode/ISBN or
   title.
 
-## Redesign in progress — "Japanese retro collection room"
+## The "Japanese retro collection room" redesign (done)
 
-Adrian wants the whole UI reskinned into a Japanese retro-collector's-room
-aesthetic (wood shelves, a comic long-box you browse by hovering, a lit
-figures cabinet, a cat mascot) instead of the old plain grid.
+The whole UI is reskinned into a Japanese retro-collector's-room aesthetic
+(wood shelves, a comic long-box, a lit figures display case, a cat mascot)
+instead of the old plain grid. Shipped and merged to `master`.
 
-- **Branch:** `feature/retro-collection-room` — don't touch `main` for this.
 - **Pure CSS + inline SVG, no AI-generated art.** An earlier pass tried
   AI-generated PNG assets for the shelf/chrome art (see `ASSET_LIST.md`,
-  now historical) — Adrian said it didn't look right, and a second,
-  independent CSS-only prototype he had made looked closer despite not
-  being asset-based at all. Root cause, documented in `LOG.md`'s
+  kept only as a historical record — the files themselves were deleted,
+  nothing references them) — Adrian said it didn't look right, and a
+  second, independent CSS-only prototype he had made looked closer despite
+  not being asset-based at all. Root cause, documented in `LOG.md`'s
   2026-11-12 pivot entry: generated PNGs were inconsistent to art-direct
   (decode failures, huge invisible padding, baked-in content that can't
   hold a variable-size collection) in a way pure CSS/SVG just doesn't have.
-  The old generated PNGs still sit in `assets/` but nothing references them.
 - **Everything that's real data stays real DOM**: item covers, titles,
   counts, search, sort — never baked into an image or fixed markup.
-- Comics (the long-box, `renderComicBox` in `app.js`) and Figures (the glass
-  case, `renderFiguresCase`) both use real data now — no longer blocked.
+- Comics (the long-box, `renderComicBox` in `app.js`) and Figures (the
+  rotating glass case, `renderFiguresCase`) both use real data.
+- Figures-specific since then: a rotating-shelf pagination past 4 rows, a
+  "pull the figure off the shelf" click interaction before editing, and
+  flood-fill background removal on an uploaded or pasted figure photo
+  (asks first, never automatic — see `LOG.md`).
 - Must not break: scanning, manual entry, existing Firestore data, search,
   category switching, edit/delete, the Worker-backed lookups.
+
+## Workflow with git
+
+Push a commit to a feature branch → open a PR → merge it to `master`
+automatically, without waiting for approval first (Adrian's standing
+instruction — see his memory note on this). Don't commit directly to
+`master`.
 
 ## Working with Adrian
 

@@ -1,5 +1,11 @@
 # Retro Collection Room — Asset List
 
+> **Historical — this approach was abandoned.** The AI-generated PNG assets
+> this document planned were generated, wired in, then scrapped in favor of
+> pure CSS/SVG (see `LOG.md`'s 2026-11-12 pivot entry and `CLAUDE.md`). The
+> actual files were deleted from `assets/` once nothing referenced them.
+> Kept here only as a record of what was tried and why it didn't work.
+
 Decorative art assets needed for the `feature/retro-collection-room` redesign,
 derived from the two ChatGPT mockup images Adrian supplied. Generate these
 with an image AI (ask for **one asset per image, transparent background,

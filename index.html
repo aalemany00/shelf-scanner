@@ -306,24 +306,16 @@
         <button type="button" class="status-chip" data-status="read">Read It</button>
       </div>
       <p id="itemNotes"></p>
-      <div class="form-actions">
+      <div id="itemActionsRow" class="form-actions">
         <button id="deleteItemBtn" class="btn danger">Remove</button>
         <button id="editItemBtn" class="btn">Edit</button>
         <button id="moveItemBtn" class="btn hidden">Move</button>
         <button id="closeItemBtn" class="btn">Close</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Comics only: the collection grid groups owned items by series; this
-       lists the individual owned issues within one series. Books & Manga
-       shows every item directly on its shelf, no series grouping. -->
-  <div id="seriesOverlay" class="overlay hidden">
-    <div class="overlay-card series-card">
-      <h3 id="seriesOverlayTitle"></h3>
-      <div id="seriesOverlayGrid" class="grid"></div>
-      <div class="form-actions">
-        <button id="closeSeriesBtn" class="btn">Close</button>
+      <div id="deleteConfirmRow" class="form-actions hidden">
+        <span id="deleteConfirmText" class="delete-confirm-text"></span>
+        <button id="deleteConfirmBtn" class="btn danger">Yes, remove it</button>
+        <button id="deleteCancelBtn" class="btn">Cancel</button>
       </div>
     </div>
   </div>

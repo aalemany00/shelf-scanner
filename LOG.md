@@ -1126,3 +1126,70 @@ showed; after the fix, re-measured actual item/case rects at both widths
 (not just eyeballing a screenshot) — zero items past the case's bottom
 edge at the narrow width, zero at the wide width, and the remaining
 perspective bulge down from ~20px to under 5px.
+
+## 2026-11-13 (self-directed cleanup pass)
+
+**Planned:** Adrian asked what else I thought needed improving. Flagged a
+handful of things from reading back through the code and this log, and he
+said to go ahead and make the changes.
+
+**Built:**
+- **Delete confirmation.** `deleteItemBtn` used to remove an item from the
+  real, synced collection on a single click — no "are you sure," no undo
+  anywhere in the app. Added an inline confirm step in the item overlay
+  (`itemActionsRow`/`deleteConfirmRow` in index.html, swapped in app.js) —
+  `Remove "<title>"? This can't be undone.` with Yes/Cancel — before the
+  delete (and its Firestore sync) actually happens.
+- **Silent sync failures surfaced.** The delete flow's Firestore write
+  already had failure-handling (`pendingWrites`, see the comment in
+  app.js), but caught the error and said nothing. Now calls `setStatus(...)`
+  so a failed cross-device sync after a delete is visible instead of
+  silently leaving devices out of sync until Adrian happens to notice.
+- **Figure-hold is keyboard-accessible.** The cloned `<img>` from the
+  "pull a figure off the shelf" interaction (see the 2026-11-12 entry)
+  had no way for a keyboard user to confirm the second "edit" step — a
+  mouse click worked, Enter/Space didn't. Added `tabindex="0"`,
+  `role="button"`, an `aria-label`, an Enter/Space keydown handler, and
+  auto-focus when the hold opens, plus a focus-visible outline.
+- **Dead code removed:** `renderSeriesGroupedGrid`, `showSeriesOverlay`/
+  `hideSeriesOverlay`, `renderFlatGrid`, `buildGridTile`, the
+  `#seriesOverlay` DOM in index.html, `state.seriesOverlaySeries`, and the
+  now-unused `.grid-item`/`.series-card`/`.series-tile .badge` CSS — all
+  confirmed unreferenced (comics switched to the long-box, `renderComicBox`,
+  back when the redesign shipped, and this series-drill-down path was never
+  wired back up). `escapeHtml` and `.grid`/`#grid` are still real/used
+  elsewhere, left alone.
+- **Unused assets deleted:** the 10 AI-generated PNGs from the abandoned
+  baked-art redesign attempt (`cat-mascot-idle.png`,
+  `reference-comicbox-baked.png`, `shelf-games.png`, etc. — ~20MB,
+  confirmed zero references anywhere) are removed from the repo.
+  `ASSET_LIST.md` now says up top that the approach was abandoned and the
+  files are gone, rather than just implying it. The one stray
+  `playstation_4...jpg` Adrian had already said he'd delete himself is
+  still untracked and still there — couldn't remove it from this session
+  (sandboxed from deleting files outside git's own tracking), so left for
+  him.
+- **Stale docs fixed:** `README.md`'s Status section still described the
+  redesign as "in progress on `feature/retro-collection-room`" — it's been
+  merged to master repeatedly since. `CLAUDE.md`'s "Redesign in progress"
+  section had the same staleness (plus "don't touch main," no longer how
+  this project works) and didn't mention the figures-specific work done
+  since the redesign shipped (pagination, pull-off-shelf, background
+  removal) — rewrote both, and added a short "Workflow with git" section to
+  CLAUDE.md recording the auto-PR-and-merge workflow Adrian asked for.
+
+**Verified:** ran the full app, added then removed a real test item through
+the new delete-confirm flow (Cancel first, confirmed it didn't delete; then
+Yes, confirmed it did), confirmed the figure-hold's second step opens the
+edit overlay via a real Enter keypress on the focused element (not just a
+click) and that Escape still cancels back to the shelf, and clicked through
+every category tab after the dead-code removal with a `window.onerror`
+listener attached — zero errors.
+
+**Open items:**
+- The one stray `assets/playstation_4...jpg` file — still there, still
+  Adrian's to delete.
+- Smaller things flagged but not done (lower priority): no drag-to-reorder
+  gesture on the crop-range sliders beyond native `<input type="range">`,
+  and `app.js` is one 2,600+-line file/closure with no module split — fine
+  at this project's size, worth knowing if it keeps growing.

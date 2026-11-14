@@ -25,11 +25,11 @@ there even though it won't over plain `http://` on your phone.
 
 Shipped and live. Scan/lookup/manual-entry, Firebase sync across devices,
 category-specific lookups (OMDb/RAWG/ComicVine/Open Library via the
-Cloudflare Worker in `worker/`), and Have/Want/Read shelves with sorting all
-work.
+Cloudflare Worker in `worker/`), Have/Want/Read shelves with sorting, and
+the Japanese retro collection-room redesign (shop-front chrome, a rotating
+figures display case, a comic long-box, real spine art) are all merged to
+`master` and live.
 
-Now in progress: a full visual redesign into an illustrated Japanese retro
-collection-room look, on branch `feature/retro-collection-room` — see
-`CLAUDE.md` and `ASSET_LIST.md`.
-
-See `LOG.md` for the plans/changes log.
+See `LOG.md` for the plans/changes log, `CLAUDE.md` for how this project is
+set up to work with Claude Code, and `ASSET_LIST.md` for the (abandoned)
+baked-art approach tried early in the redesign.
