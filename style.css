@@ -771,7 +771,6 @@ img { max-width: 100%; }
   .spine:hover, .spine:focus-visible { transform: none; }
   .figures-rotor { transition: none; }
   .figure-hold-img, .figure-hold-backdrop, .figure-hold-hint { transition: none; }
-  .comic-topdown-item, .comic-box-face { transition: none; }
 }
 
 /* ============================================================
@@ -964,122 +963,9 @@ img { max-width: 100%; }
    nearest-to-pointer rises forward. Arrow keys / mouse wheel / touch swipe
    all shift the "selected" comic; Enter opens it.
    ============================================================ */
-/* ============================================================
-   Comics — a shelf of long-boxes (one per series/title), opened one at a
-   time. An open box shows its issues packed edge-to-edge as if looking
-   down into it; hovering (or keyboard-focusing) one pulls it up out of
-   the pack, same idea as actually flipping through a real box.
-   ============================================================ */
-.comic-box-shelf {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
-  padding: 10px 4px;
-}
-.comic-box-tile { border: 0; background: none; padding: 0; cursor: pointer; text-align: center; }
-.comic-box-lid {
-  height: 14px;
-  margin: 0 6px;
-  background: linear-gradient(100deg, #caa783, #e7d0ae 42%, #b38e6b);
-  border: 3px solid #9f7855;
-  border-bottom: 0;
-}
-.comic-box-face {
-  background: linear-gradient(100deg, #caa783, #e7d0ae 42%, #b38e6b);
-  border: 4px solid #9f7855;
-  box-shadow: 0 6px #342426, inset 0 0 0 2px #f8e5c5;
-  padding: 18px 10px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.comic-box-tile:hover .comic-box-face,
-.comic-box-tile:focus-visible .comic-box-face {
-  transform: translateY(-4px);
-  box-shadow: 0 10px #342426, inset 0 0 0 2px #f8e5c5;
-}
-.comic-box-label {
-  font: 13px Impact, sans-serif;
-  color: #44362f;
-  letter-spacing: 0.3px;
-  margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.comic-box-count { font-size: 0.72rem; color: #6e5848; font-weight: 700; }
-
-.comic-box-open-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-.comic-box-back {
-  background: var(--cream); border: 2px solid var(--border); border-radius: 4px;
-  padding: 5px 11px; font-weight: 800; cursor: pointer; flex: none;
-}
-.comic-box-open-title { font: 15px Impact, sans-serif; color: var(--red-dark); letter-spacing: 0.3px; }
-
-/* Tilted back like looking down into a real open long-box at an angle
-   (see LOG.md and the reference photo Adrian sent) — the box's whole
-   cardboard face (background, border, the works) is rotated back on its
-   front-bottom edge, not just the comics inside it, so the box itself
-   reads as a tilted 3D surface (its rectangular border visibly
-   foreshortens) rather than a flat panel with oddly-squashed contents
-   inside it. The comics sit in a normal flat row on that tilted surface.
-   A hovered/focused comic cancels the box's rotation on itself
-   (rotateX(50) * rotateX(-50) = no net rotation — the standard
-   "un-tilt one item inside a tilted 3D parent" trick) and comes forward
-   on its own Z axis, so it ends up facing the viewer square-on, like it's
-   been lifted out of the box to look at. */
-.comic-box-open { perspective: 1300px; perspective-origin: 50% 0%; }
-.comic-box-topdown {
-  background: linear-gradient(100deg, #caa783, #e7d0ae 42%, #b38e6b);
-  border: 5px solid #9f7855;
-  box-shadow: inset 0 0 0 2px #f8e5c5, 0 8px #342426;
-  padding: 10px 14px;
-  min-height: 150px;
-  overflow-x: auto;
-  overflow-y: visible;
-  transform-style: preserve-3d;
-  transform: rotateX(50deg);
-  transform-origin: bottom center;
-}
-.comic-topdown-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  min-height: 120px;
-  width: max-content;
-  margin: 0 auto;
-}
-.comic-topdown-item {
-  position: relative;
-  flex: none;
-  width: 14px;
-  height: 120px;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  overflow: hidden;
-  border-radius: 1px 1px 0 0;
-  box-shadow: 1px 0 0 #0004 inset;
-  transform-style: preserve-3d;
-  transform-origin: bottom center;
-  transition: width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
-              height 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
-              transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.comic-topdown-item img {
-  position: absolute;
-  bottom: 0; left: 0;
-  width: 92px;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
-}
-.comic-topdown-item:hover,
-.comic-topdown-item:focus-visible {
-  width: 92px;
-  height: 150px;
-  transform: rotateX(-50deg) translateZ(70px) translateY(40px);
-  z-index: 5;
-  box-shadow: 4px 10px 18px #000a;
-}
+/* Comics now render via the ComicLongBoxes component (comic-longboxes.js/
+   .css) — see app.js's renderComicBox. This file no longer styles comics
+   directly. */
 .empty-on-shelf { color: var(--gold); font-size: 0.85rem; text-align: center; padding: 2rem 0; }
 
 /* ============================================================
@@ -1099,7 +985,6 @@ img { max-width: 100%; }
   .scan-panel small, .manual-panel small { display: none; }
   .city-poster { display: none; }
   .workspace { padding: 8px; }
-  .comic-box-shelf { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
   .games-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 600px) {
