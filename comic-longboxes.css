@@ -70,7 +70,9 @@
 .clb-open-well { position: relative; min-height: 522px; background: linear-gradient(90deg, #6e4d34, #a78462 12%, #bba07e 50%, #886346 91%, #5c3e2e); box-shadow: inset 0 0 28px #2b190eaa; }
 .clb-well-lining { position: absolute; inset: 15px 13px 6px; background: repeating-linear-gradient(0deg, #e3ded0 0 3px, #a7a197 3px 5px, #f4efe4 5px 11px); opacity: .38; box-shadow: inset 0 0 22px #0009; }
 .clb-open-stack { position: relative; width: 86%; height: 502px; margin: 0 auto; padding-top: 10px; overflow: visible; }
-.clb-comic { --comic-index: 0; --comic-z: 1; appearance: none; border: 0; position: absolute; top: calc(11px + var(--comic-index) * 19px); left: 1%; width: 98%; height: 248px; padding: 0; cursor: pointer; text-align: left; z-index: var(--comic-z); background: #eee5d4; border-left: 5px solid #e7e0d2; border-right: 5px solid #b0aa9f; border-top: 4px solid #faf7ee; box-shadow: 0 -2px 0 #fdfaf2, 0 3px 1px #35251c60, inset 0 0 0 1px #9b9384; transform-origin: 50% 60%; transition: transform .25s cubic-bezier(.2,.8,.2,1), filter .25s, box-shadow .25s; }
+/* Purely decorative/visual now -- a .clb-comic never receives pointer
+   events itself (see .clb-comic-hotspot below for why). */
+.clb-comic { --comic-index: 0; --comic-z: 1; border: 0; position: absolute; top: calc(11px + var(--comic-index) * 19px); left: 1%; width: 98%; height: 248px; padding: 0; pointer-events: none; text-align: left; z-index: var(--comic-z); background: #eee5d4; border-left: 5px solid #e7e0d2; border-right: 5px solid #b0aa9f; border-top: 4px solid #faf7ee; box-shadow: 0 -2px 0 #fdfaf2, 0 3px 1px #35251c60, inset 0 0 0 1px #9b9384; transform-origin: 50% 60%; transition: transform .25s cubic-bezier(.2,.8,.2,1), filter .25s, box-shadow .25s; }
 .clb-comic:nth-child(3n) { left: 0; transform: rotate(-.4deg); }
 .clb-comic:nth-child(4n) { left: 2%; transform: rotate(.35deg); }
 .clb-comic-board { position: absolute; inset: 0; background: #fdf9ec; box-shadow: inset 0 0 0 6px #f5efe5; }
@@ -79,8 +81,35 @@
 .clb-comic-fallback { position: absolute; inset: 15px; display: flex; align-items: center; justify-content: center; font: 21px/1.06 Impact,sans-serif; color: #f8e3ac; text-align: center; text-transform: uppercase; overflow-wrap: anywhere; z-index: 0; }
 .clb-comic-ridge { position: absolute; z-index: 2; top: -2px; left: 8px; right: 8px; height: 17px; display: flex; justify-content: space-between; align-items: center; overflow: hidden; white-space: nowrap; color: #6d6255; font: 800 8px 'Trebuchet MS',sans-serif; letter-spacing: 1px; padding: 0 8px; background: linear-gradient(#fffefa, #dcd7cc); box-shadow: 0 1px 0 #c8beb2; }
 .clb-comic-sleeve { position: absolute; z-index: 4; inset: 0; pointer-events: none; background: linear-gradient(110deg, #fff6 0, transparent 17%, #fff2 40%, transparent 60%, #fff4 82%, transparent); border: 1px solid #ffffff8a; }
-.clb-comic:hover, .clb-comic:focus-visible, .clb-comic.clb-is-pulled { z-index: 500 !important; transform: translateY(-75px) rotate(-2.5deg) scale(1.04); filter: brightness(1.035); box-shadow: 0 16px 24px #241810a8, 0 0 0 3px #fdf9ed; }
-.clb-comic:hover .clb-comic-ridge, .clb-comic:focus-visible .clb-comic-ridge, .clb-comic.clb-is-pulled .clb-comic-ridge { background: #fff5db; color: #843c2f; }
+.clb-comic.clb-is-pulled { z-index: 500 !important; transform: translateY(-75px) rotate(-2.5deg) scale(1.04); filter: brightness(1.035); box-shadow: 0 16px 24px #241810a8, 0 0 0 3px #fdf9ed; }
+.clb-comic.clb-is-pulled .clb-comic-ridge { background: #fff5db; color: #843c2f; }
+
+/* A fixed, never-moving, always-on-top hit-area per comic -- see the
+   comment above the hotspot-building code in comic-longboxes.js for why
+   this exists separately from the big visual .clb-comic cards above (in
+   short: a pulled card enlarges and jumps to z-index 500, which used to
+   physically cover and block every other comic's own hit area). Each
+   hotspot sits exactly where that comic's resting ridge is, so hovering a
+   "covered" comic always works no matter what's currently pulled forward
+   on top of it. */
+.clb-hotspot-layer { position: absolute; inset: 0; z-index: 900; }
+.clb-comic-hotspot {
+  appearance: none;
+  position: absolute;
+  top: calc(11px + var(--comic-index) * 19px);
+  left: 1%;
+  width: 98%;
+  height: 21px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+}
+.clb-comic-hotspot:focus-visible { outline: 2px solid #f4ba60; outline-offset: 1px; }
+/* The front-most comic has nothing covering it, so its whole visible
+   cover -- not just a thin ridge band -- should respond to hover/click. */
+.clb-comic-hotspot-front { height: 248px; }
 .clb-short-wall-near { position: absolute; left: -13px; right: -13px; bottom: -57px; height: 56px; background: linear-gradient(95deg, #ba9671, #e4cba4 20%, #ecdbb8 70%, #b38b68); border: 3px solid #a17e5b; border-top: 8px solid #f6e4bf; box-shadow: inset 0 0 0 2px #d7b78e; z-index: 800; pointer-events: none; }
 .clb-open-handle { position: absolute; bottom: -33px; left: 50%; transform: translateX(-50%); width: 74px; height: 12px; border-radius: 40%; background: #493327; border: 3px solid #ad8b68; box-shadow: inset 0 2px 1px #1f1511; z-index: 801; }
 .clb-box-floor-note { text-align: center; margin: 18px 0 0; color: #f2ddb7; letter-spacing: 1.8px; font-size: 9px; font-weight: 900; }
