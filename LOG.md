@@ -1251,3 +1251,40 @@ not just a mouse click). No console errors across the whole flow.
   design, so there's no keyboard equivalent to "browse without opening an
   issue" beyond tabbing between tiles (which does peek each one via
   `:focus-visible`).
+
+## 2026-11-13 (comics: match the box's actual 3D perspective to a reference photo)
+
+**Reported:** Adrian sent a real photo of comic long-boxes (three boxes
+side by side, each a visibly tilted trapezoid shape, comics standing
+packed edge-to-edge inside, the front-most one in each box facing the
+camera) and said the open-box view "should be in this perspective" — the
+flat horizontal strip from the first pass didn't read as looking down into
+an angled box at all.
+
+**Found the actual problem with the first attempt:** it *was* applying a
+real `rotateX` 3D tilt (confirmed via the computed `matrix3d` value), but
+only to the inner row of comics — the box's own background/border stayed
+completely flat and undistorted. That mismatch (a flat rectangular box
+with oddly vertically-squashed images floating inside it) read as a
+rendering glitch, not a tilted surface, since nothing else in the frame
+corroborated the tilt.
+
+**Fixed:** moved the `rotateX` tilt onto `.comic-box-topdown` itself —
+the whole cardboard box (background, border, box-shadow, all of it) —
+instead of just the row inside it. With the box's own rectangular border
+now foreshortening into a trapezoid the same way the comics do, the whole
+thing reads coherently as one tilted surface, much closer to the photo.
+The hover/focus "pull a comic out" effect still works the same way
+(`rotateX(-50deg) translateZ(70px) translateY(40px)` cancels the parent's
+tilt on that one comic and brings it toward the viewer, facing front-on)
+— it just now reads as pulling the comic out of a box that visibly *is*
+a box, rather than out of a flat panel.
+
+**Verified:** reran the hover-pull on the real "Spider-Man" box and
+confirmed via a cropped screenshot that the box border and the packed
+comics both foreshorten together into a trapezoid matching the photo's
+framing, that hovering lifts one comic to face the camera while the rest
+stay in the tilted box, and that clicking still opens the real item
+overlay (confirmed the title, "Spider-Man #17," matched the clicked
+issue). Also checked a mobile-width viewport — the box still scrolls
+internally without the whole page gaining horizontal overflow.
