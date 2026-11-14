@@ -771,6 +771,7 @@ img { max-width: 100%; }
   .spine:hover, .spine:focus-visible { transform: none; }
   .figures-rotor { transition: none; }
   .figure-hold-img, .figure-hold-backdrop, .figure-hold-hint { transition: none; }
+  .comic-topdown-item, .comic-box-face { transition: none; }
 }
 
 /* ============================================================
@@ -963,85 +964,98 @@ img { max-width: 100%; }
    nearest-to-pointer rises forward. Arrow keys / mouse wheel / touch swipe
    all shift the "selected" comic; Enter opens it.
    ============================================================ */
-.comic-showcase { display: grid; grid-template-columns: 90px 1fr; gap: 10px; min-height: 260px; align-items: center; }
-.comic-callout {
-  position: relative;
-  padding: 16px 4px;
-  text-align: center;
-  color: #253549;
-  background: #f8de92;
-  border: 3px solid #3a2d2b;
-  box-shadow: 3px 4px #6f3329;
-  transform: rotate(-9deg);
-  font: 18px/0.95 Impact, sans-serif;
-  clip-path: polygon(3% 16%, 18% 12%, 18% 0, 35% 9%, 50% 0, 62% 9%, 82% 2%, 81% 13%, 100% 20%, 92% 41%, 100% 60%, 89% 68%, 98% 91%, 76% 89%, 64% 100%, 48% 90%, 32% 100%, 23% 85%, 4% 90%, 11% 71%, 0 52%, 9% 35%);
+/* ============================================================
+   Comics — a shelf of long-boxes (one per series/title), opened one at a
+   time. An open box shows its issues packed edge-to-edge as if looking
+   down into it; hovering (or keyboard-focusing) one pulls it up out of
+   the pack, same idea as actually flipping through a real box.
+   ============================================================ */
+.comic-box-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  padding: 10px 4px;
 }
-.comic-callout small { display: block; font: 8px Arial, sans-serif; margin-top: 6px; }
+.comic-box-tile { border: 0; background: none; padding: 0; cursor: pointer; text-align: center; }
+.comic-box-lid {
+  height: 14px;
+  margin: 0 6px;
+  background: linear-gradient(100deg, #caa783, #e7d0ae 42%, #b38e6b);
+  border: 3px solid #9f7855;
+  border-bottom: 0;
+}
+.comic-box-face {
+  background: linear-gradient(100deg, #caa783, #e7d0ae 42%, #b38e6b);
+  border: 4px solid #9f7855;
+  box-shadow: 0 6px #342426, inset 0 0 0 2px #f8e5c5;
+  padding: 18px 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.comic-box-tile:hover .comic-box-face,
+.comic-box-tile:focus-visible .comic-box-face {
+  transform: translateY(-4px);
+  box-shadow: 0 10px #342426, inset 0 0 0 2px #f8e5c5;
+}
+.comic-box-label {
+  font: 13px Impact, sans-serif;
+  color: #44362f;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comic-box-count { font-size: 0.72rem; color: #6e5848; font-weight: 700; }
 
-.box-scene { position: relative; height: 250px; min-width: 0; }
-.comic-papers {
-  position: absolute; left: 3%; right: 3%; top: 0; height: 182px;
-  perspective: 520px;
-  outline: none;
-  cursor: ew-resize;
-  touch-action: pan-y;
-  z-index: 3;
+.comic-box-open-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.comic-box-back {
+  background: var(--cream); border: 2px solid var(--border); border-radius: 4px;
+  padding: 5px 11px; font-weight: 800; cursor: pointer; flex: none;
 }
-.comic-card {
-  position: absolute;
-  bottom: -14px;
-  width: min(20%, 96px);
-  height: 148px;
-  border: 3px solid #f2e2c6;
-  background: #c3b49a;
-  padding: 0;
-  box-shadow: 3px 4px #202636, 5px 7px #120f1caa;
-  transform-origin: bottom center;
-  transition: transform 0.22s cubic-bezier(.2,.8,.2,1), filter 0.2s;
-  filter: saturate(0.78) brightness(0.88);
-  cursor: pointer;
-}
-.comic-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.comic-card.selected { filter: saturate(1.12) brightness(1.07); box-shadow: 5px 10px 0 #171929, 9px 15px 17px #000b; }
-.comic-card:hover { filter: brightness(1.1); }
-.comic-papers:before {
-  content: "";
-  position: absolute; bottom: -2px; left: 4%; right: 4%; height: 115px;
-  background: repeating-linear-gradient(90deg, #ece1ce 0 3px, #b9a98f 3px 5px, #f0eadb 5px 7px, #5c5351 8px 9px);
-  transform: skewY(2deg);
-  border: 5px solid #d9c5a4;
-  box-shadow: 0 5px #6b5848;
-  z-index: 0;
-}
-.longbox-lip {
-  position: absolute; top: 158px; left: 0; right: 0; height: 18px; z-index: 8;
-  background: linear-gradient(#f2e4ce, #b99a71);
-  border: 3px solid #65503c;
-  transform: perspective(400px) rotateX(46deg);
-  box-shadow: 0 6px 8px #0009;
-}
-.longbox-front {
-  position: absolute; z-index: 9; top: 171px; left: 4%; right: 4%; height: 68px;
+.comic-box-open-title { font: 15px Impact, sans-serif; color: var(--red-dark); letter-spacing: 0.3px; }
+
+.comic-box-topdown {
   background: linear-gradient(100deg, #caa783, #e7d0ae 42%, #b38e6b);
   border: 5px solid #9f7855;
-  box-shadow: 0 8px #342426, inset 0 0 0 2px #f8e5c5;
-  transform: perspective(650px) rotateX(-7deg);
+  box-shadow: inset 0 0 0 2px #f8e5c5, 0 8px #342426;
+  padding: 24px 14px 18px;
+  min-height: 150px;
+  overflow-x: auto;
+  overflow-y: visible;
 }
-.longbox-label {
-  border: 2px solid #7f6559;
-  display: flex; gap: 8px; justify-content: center; align-items: center;
-  width: max-content; margin: 10px auto; padding: 4px 11px;
-  background: #f2e5cd; color: #44362f;
+.comic-topdown-row { display: flex; align-items: flex-end; gap: 2px; min-height: 120px; width: max-content; }
+.comic-topdown-item {
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 120px;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: 1px 1px 0 0;
+  box-shadow: 1px 0 0 #0004 inset;
+  transform-origin: bottom center;
+  transition: width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+              height 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+              transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.longbox-label span { font: 9px Impact, sans-serif; letter-spacing: 1px; }
-.longbox-label b { font-size: 11px; }
-.comic-controls {
-  position: absolute; bottom: -2px; left: 10%; right: 10%; z-index: 11;
-  color: #edcb99;
-  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+.comic-topdown-item img {
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 92px;
+  height: 120px;
+  object-fit: cover;
+  object-position: center top;
 }
-.comic-controls button { background: #f1deb9; color: #6e3c2c; border: 2px solid #2b2d32; font-weight: 900; border-radius: 4px; padding: 4px 8px; }
-.comic-controls strong { font-size: 9px; letter-spacing: 1.5px; }
+.comic-topdown-item:hover,
+.comic-topdown-item:focus-visible {
+  width: 92px;
+  height: 150px;
+  transform: translateY(-22px);
+  z-index: 5;
+  box-shadow: 4px 10px 18px #000a;
+}
 .empty-on-shelf { color: var(--gold); font-size: 0.85rem; text-align: center; padding: 2rem 0; }
 
 /* ============================================================
@@ -1061,8 +1075,7 @@ img { max-width: 100%; }
   .scan-panel small, .manual-panel small { display: none; }
   .city-poster { display: none; }
   .workspace { padding: 8px; }
-  .comic-showcase { display: block; }
-  .comic-callout { display: none; }
+  .comic-box-shelf { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
   .games-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 600px) {
