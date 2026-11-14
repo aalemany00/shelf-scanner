@@ -1316,6 +1316,10 @@
   }
 
   function renderComicBox(container, items) {
+    if (window.ComicLongBoxes) {
+      window.ComicLongBoxes.render(container, items, showItemOverlay);
+      return;
+    }
     if (!items.length) {
       comicBoxesState.openBoxKey = null;
       container.appendChild(text("div", "empty-on-shelf", "YOUR COMIC COLLECTION IS EMPTY"));

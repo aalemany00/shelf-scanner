@@ -1,9 +1,11 @@
-var CACHE_NAME = "shelf-scanner-v2";
+var CACHE_NAME = "shelf-scanner-v3";
 var SHELL_FILES = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
+  "./comic-longboxes.js",
+  "./comic-longboxes.css",
   "./manifest.json",
   "./icon.svg"
 ];
