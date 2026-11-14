@@ -1344,3 +1344,59 @@ errors, comics render and behave identically to right after PR #9 merged.
   (`--clb-ink`, `--clb-rust`, etc.) instead of the shared theme variables
   in `style.css` (`--red`, `--ink`, ...) — cosmetically consistent right
   now, but won't follow if the main theme's palette changes later.
+
+## 2026-11-14 (comics: fixed the stack actually blocking itself, reordered issues)
+
+**Reported:** Adrian said that in the open-box view, "the front and back
+comic block you from looking at the others," and asked for lower issue
+numbers to sit at the front of the stack instead of the back.
+
+**Found the real bug:** `.clb-comic.clb-is-pulled` (the hover/pull-forward
+state) enlarges a comic to its full 248px cover height and jumps its
+z-index to 500 — both correct for the visual effect, but since EVERY comic
+in the stack was ALSO the thing receiving hover/click directly, a pulled
+comic's now-much-bigger, now-topmost hit area physically covered the
+resting hit areas of every other comic underneath it. In a 6-issue box,
+measuring real screen rects showed a single pulled comic's enlarged
+bounding box can cover 3-4 of the other comics' entire slots — meaning
+once you hovered one, the mouse would stay stuck on it (or whichever one
+happened to be covering the position you moved to next) instead of
+genuinely reaching the comic underneath, exactly matching what Adrian
+described.
+
+**Fixed:** split "what you see" from "what you can click." Each comic's
+big visual card (`.clb-comic`) is now purely decorative (`pointer-events:
+none`, no longer a `<button>`) — all hover/focus/click handling moved to
+a new, separate `.clb-comic-hotspot` layer: small, fixed buttons that sit
+exactly at each comic's own resting ridge slot and **never move or
+resize**, regardless of which comic is currently pulled forward
+elsewhere in the stack. Because they're on their own always-on-top layer
+(`z-index: 900`, above even a pulled comic's `z-index: 500`), a hotspot
+can never be covered — hovering any comic always works, no matter what's
+currently pulled. The front-most comic (nothing covers it) gets a
+full-height hotspot instead of a thin ridge-height one, since its whole
+visible cover should respond to hover and click, not just a sliver at its
+top.
+
+**Also reordered the stack:** `boxesFrom`'s per-box sort was already
+ascending by issue number for display purposes (the "FILING RANGE" label,
+pagination), but the *render* order fed that same ascending list straight
+into the stack-building loop, and since later-rendered comics get higher
+z-index (further toward the front), the *highest* issue number ended up
+at the front and the lowest at the back — backwards from what Adrian
+wanted. Reversed only the render order (`shown.slice().reverse()`),
+leaving the ascending order intact for the FILING RANGE label and
+pagination math.
+
+**Verified:** reloaded the real "Spider-Man" box (6 issues: #2, #7, #8,
+#9, #17, and a one-shot) and confirmed via actual measured screen
+coordinates that #2 (lowest) now renders at the front and the one-shot/#17
+at the back. Simulated pulling the front comic forward, then checked
+every other comic's hotspot was still independently reachable at its own
+position (`elementFromPoint` on each one's exact rect, not just eyeballing
+it) — all six reachable both before and during another comic being
+pulled. Re-tested real mouse hover switching between comics (not just
+synthetic events), click-to-open still resolving to the correct item,
+keyboard focus still pulling the right comic forward, and the touch
+two-tap flow (pull forward, then open) — all unchanged in behavior,
+just no longer gets stuck. Zero console errors throughout.

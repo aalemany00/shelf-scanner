@@ -259,14 +259,29 @@
       label.querySelector('.clb-current-help').textContent = it ? 'Click to see cover details and collection information.' : 'Move your pointer across the white edges to lift a comic out.';
     }
 
-    shown.forEach(function (item, index) {
-      var comic = make('button', 'clb-comic');
-      comic.type = 'button';
+    // Lower issue numbers sit at the front of the stack (closer to the
+    // viewer), higher numbers further back -- `shown` stays in ascending
+    // order for the FILING RANGE label below, but the render order (which
+    // also decides z-stacking: later-rendered = higher z = further front)
+    // is reversed so the lowest number ends up rendered last.
+    var renderList = shown.slice().reverse();
+
+    // Hotspots are a separate, fixed, always-on-top layer that actually
+    // handles hover/focus/click, instead of the big visual `.clb-comic`
+    // cards themselves. Without this, pulling a comic forward (it enlarges
+    // to full cover size and jumps to a high z-index, see .clb-is-pulled)
+    // made it physically cover its neighbors' own hit areas -- once one
+    // comic was pulled, the others became completely unreachable until the
+    // mouse fully left the stack. A hotspot never moves or resizes, so it's
+    // never covered no matter which comic is currently pulled.
+    var hotspots = make('div', 'clb-hotspot-layer');
+
+    renderList.forEach(function (item, index) {
+      var comic = make('div', 'clb-comic');
       comic.style.setProperty('--comic-index', String(index));
       comic.style.setProperty('--comic-z', String(index + 1));
       comic.style.setProperty('--sleeve-hue', String(index % 4));
-      comic.setAttribute('aria-label', 'Inspect ' + (item.title || 'Comic issue'));
-      comic.setAttribute('title', item.title || 'Comic issue');
+      comic.setAttribute('aria-hidden', 'true');
       var board = make('span', 'clb-comic-board');
       comic.appendChild(board);
       var art = make('span', 'clb-comic-art');
@@ -277,22 +292,34 @@
       spine.appendChild(make('span', '', issueLabel(item)));
       comic.appendChild(spine);
       comic.appendChild(make('span', 'clb-comic-sleeve'));
-      comic.addEventListener('pointerenter', function () { if (!isTouch) selectIssue(item, comic); });
-      comic.addEventListener('focus', function () { if (!isTouch) selectIssue(item, comic); });
-      comic.addEventListener('click', function () {
+      stack.appendChild(comic);
+
+      var hotspot = make('button', 'clb-comic-hotspot');
+      hotspot.type = 'button';
+      hotspot.style.setProperty('--comic-index', String(index));
+      // The front-most comic (last in render order) has no neighbor
+      // covering it, so its whole visible cover should respond to hover
+      // and click, not just the thin ridge band every other comic gets.
+      if (index === renderList.length - 1) hotspot.classList.add('clb-comic-hotspot-front');
+      hotspot.setAttribute('aria-label', 'Inspect ' + (item.title || 'Comic issue'));
+      hotspot.setAttribute('title', item.title || 'Comic issue');
+      hotspot.addEventListener('pointerenter', function () { if (!isTouch) selectIssue(item, comic); });
+      hotspot.addEventListener('focus', function () { if (!isTouch) selectIssue(item, comic); });
+      hotspot.addEventListener('click', function () {
         if (isTouch && selectedIssue !== item) {
           selectIssue(item, comic);
           return;
         }
         ctx.onItem(item);
       });
-      stack.appendChild(comic);
+      hotspots.appendChild(hotspot);
     });
 
     // Small variations in the stack depth preserve the long-box silhouette.
-    stack.addEventListener('pointerleave', releaseIssue);
-    stack.style.setProperty('--stack-count', String(shown.length));
+    hotspots.addEventListener('pointerleave', releaseIssue);
+    stack.style.setProperty('--stack-count', String(renderList.length));
     well.appendChild(stack);
+    well.appendChild(hotspots);
     boxFrame.appendChild(well);
     boxFrame.appendChild(make('div', 'clb-short-wall clb-short-wall-near'));
     boxFrame.appendChild(make('div', 'clb-open-handle'));
