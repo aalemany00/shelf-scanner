@@ -1193,3 +1193,61 @@ listener attached — zero errors.
   gesture on the crop-range sliders beyond native `<input type="range">`,
   and `app.js` is one 2,600+-line file/closure with no module split — fine
   at this project's size, worth knowing if it keeps growing.
+
+## 2026-11-13 (comics: a shelf of boxes, browsed top-down)
+
+**Planned:** Adrian said Comics "are a little messed up" and described a
+specific redesign:
+1. A top-down view of a long box with the comics packed in, not the old
+   fanned-out side view.
+2. Hovering pulls a comic up out of the pack to see it, like physically
+   pulling one out of a real box.
+3. Multiple boxes, organized "in a way you see fit," shown as a selection
+   on the home screen — not one undifferentiated box of everything.
+4. Clicking a box focuses on it (the others disappear) and removes its
+   lid, instead of browsing a flat stack.
+5. Clicking a comic opens its details.
+
+**Decided (the organizing scheme):** one box per series (`item.seriesName`,
+which every comic already carries — ComicVine lookups set a real series
+name, manual entries default it to the title typed). A `"__singles__"`
+bucket exists for anything with no series name at all, though in practice
+that's effectively unreachable since both paths that create a comic item
+always set `seriesName` to at least the title.
+
+**Built:** replaced the single fanned long-box (`comicBoxState`,
+`renderComicCards`, `shiftComic`, the arrow-key/wheel/swipe browsing, the
+`.comic-card`/`.longbox-*` CSS) with:
+- `renderComicBoxShelf`: a grid of closed box tiles (label + issue count),
+  one per series — the "home screen" selection.
+- `renderOpenComicBox`: clicking a box swaps the shelf out entirely for
+  just that box, lid removed (a "‹ All Boxes" back button instead), with
+  its issues laid out edge-to-edge in `.comic-topdown-row` — each
+  `.comic-topdown-item` rendered as a narrow 14px sliver at rest (packed
+  tight, like looking down a row of comics standing on edge in a real box)
+  that **hovering or keyboard-focusing** widens to the full cover and
+  lifts up 22px via a CSS transition — no JS state needed for the pull
+  effect, it's a pure `:hover`/`:focus-visible` rule, which is also why it
+  works for a keyboard user tabbing through, not just a mouse.
+- Clicking a comic (pulled-out or not — the click target is the same
+  element throughout) opens the existing `showItemOverlay`, unchanged.
+- If the open box empties out (its last issue removed/moved elsewhere) or
+  disappears under a new search term, `renderComicBox` falls back to the
+  shelf automatically rather than rendering a box that no longer exists.
+
+**Verified:** ran the real app — opened the real "Spider-Man" box (6
+issues), confirmed the hover-pull on a real cover, clicked it and
+confirmed the real item overlay opened with the right issue. Added a
+second throwaway series ("ZTEST BOX TWO") to confirm multiple boxes
+actually render side by side on the shelf and a single-issue box uses
+correct singular grammar ("1 issue"), then deleted it through the item
+overlay and confirmed the shelf correctly dropped back to one box.
+Confirmed the keyboard path separately (focus + Enter opens the overlay,
+not just a mouse click). No console errors across the whole flow.
+
+**Open items:**
+- Nothing carried over from the old long-box (wheel/swipe/arrow-key
+  browsing) — the new interaction is hover-to-peek + click-to-open, by
+  design, so there's no keyboard equivalent to "browse without opening an
+  issue" beyond tabbing between tiles (which does peek each one via
+  `:focus-visible`).
