@@ -1288,3 +1288,59 @@ stay in the tilted box, and that clicking still opens the real item
 overlay (confirmed the title, "Spider-Man #17," matched the clicked
 issue). Also checked a mobile-width viewport — the box still scrolls
 internally without the whole page gaining horizontal overflow.
+
+## 2026-11-14 (comics: merged Adrian's own ChatGPT attempt (PR #9), removed my now-dead implementation)
+
+**Context:** Adrian independently had ChatGPT build its own version of the
+comics redesign ("the interactive Comic Vault prototype," PR #9,
+`feature/physical-comic-longboxes`) and asked me to review it before he
+decided whether to merge.
+
+**Reviewed (not just read the diff — pulled the branch and ran it):**
+`comic-longboxes.js`/`.css`, loaded as plain `<script>`/`<link>` tags, with
+a `window.ComicLongBoxes.render(container, items, showItemOverlay)` hook
+`app.js` calls from the top of `renderComicBox` (falling through to my
+existing implementation only if `window.ComicLongBoxes` were somehow
+missing). It's a different take on the same ask: boxes grouped by series
+(case-insensitive — nicer than mine), issues within a box sorted by a
+regex-parsed issue number, and the open box is a genuine **front-to-back
+stack** (the front comic's cover always visible, hovering one further
+back pulls it forward over the ones in front) rather than my side-by-side
+row — arguably a closer match to the reference photo than what I'd built.
+It also adds pagination for boxes over 15 issues, and a real two-tap
+touch interaction (first tap pulls a comic forward, second tap opens it)
+that I hadn't built for mine.
+
+Tested directly against the real Firestore data (the PR's own description
+flagged it as *not* browser-tested): opened the real "Spider-Man" box,
+confirmed hover-pull and click-to-open-details both work, added and then
+removed a second throwaway box to confirm multi-box rendering and that
+my earlier delete-confirmation (see the 2026-11-13 entry) still works
+through it, confirmed keyboard (focus pulls a comic forward, Enter opens
+it) and touch (two-tap) both work via direct event simulation, and
+switched through every category tab afterward with a `window.onerror`
+listener attached. Zero console errors anywhere.
+
+**The one real issue, flagged before merging:** the hook didn't replace
+my implementation, it shadowed it — `window.ComicLongBoxes` is always set
+once that script loads, so my `comicBoxesState`/`renderComicBoxShelf`/
+`renderOpenComicBox`/`buildComicTopdownTile` code (and its CSS) would have
+kept shipping as permanently-unreachable dead weight.
+
+**Merged PR #9, then removed my now-dead comics code:** deleted the whole
+box-shelf/top-down implementation and its CSS from `app.js`/`style.css`
+(including the perspective-tilt work from the two entries right above
+this one — superseded, not wasted; it's what confirmed what "the right
+perspective" even meant before Adrian's own ChatGPT attempt landed one).
+`renderComicBox` is now a thin delegation to `window.ComicLongBoxes.render`
+with a one-line fallback message if that script somehow failed to load.
+
+**Verified again after the cleanup:** re-ran the same hover → click →
+item-overlay flow and the full category-tab sweep — still zero console
+errors, comics render and behave identically to right after PR #9 merged.
+
+**Open items:**
+- `comic-longboxes.css` defines its own local color variables
+  (`--clb-ink`, `--clb-rust`, etc.) instead of the shared theme variables
+  in `style.css` (`--red`, `--ink`, ...) — cosmetically consistent right
+  now, but won't follow if the main theme's palette changes later.

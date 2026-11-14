@@ -1281,131 +1281,21 @@
     if (glass) updateCaseDots(glass);
   }
 
-  // ---------- comics: multiple long-boxes, browsed top-down ----------
-  // The collection screen shows a shelf of boxes (one per series, plus a
-  // "Singles & One-Shots" box for anything without a series) rather than
-  // one undifferentiated box of every issue. Clicking a box opens it full-
-  // screen (the other boxes disappear) showing its issues packed tightly
-  // side-by-side as if looking down into the open box; hovering one pulls
-  // it up out of the pack to actually see it (CSS-only, so it also
-  // triggers on keyboard focus); clicking it opens the real item overlay.
-
-  var comicBoxesState = { openBoxKey: null };
-
-  function groupComicsIntoBoxes(items) {
-    var bySeries = {};
-    var order = [];
-    items.forEach(function (item) {
-      var key = item.seriesName || "__singles__";
-      if (!bySeries[key]) { bySeries[key] = []; order.push(key); }
-      bySeries[key].push(item);
-    });
-    var boxes = order.map(function (key) {
-      return { key: key, label: key === "__singles__" ? "Singles & One-Shots" : key, items: bySeries[key] };
-    });
-    boxes.sort(function (a, b) {
-      if (a.key === "__singles__") return 1;
-      if (b.key === "__singles__") return -1;
-      return a.label.localeCompare(b.label);
-    });
-    return boxes;
-  }
-
-  function issueCountLabel(n) {
-    return n + (n === 1 ? " issue" : " issues");
-  }
-
+  // ---------- comics: multiple long-boxes, browsed front-to-back ----------
+  // Delegates to the ComicLongBoxes component (comic-longboxes.js) — a
+  // shelf of boxes grouped by series, each opened full-screen as a packed
+  // stack of issues you pull forward to view, same real item-details
+  // overlay on click. comic-longboxes.js is a required, always-loaded
+  // plain <script> tag in index.html (loaded before app.js), so
+  // window.ComicLongBoxes is always defined by the time this runs; the
+  // guard below is just cheap insurance against a load failure, not a
+  // real fallback UI.
   function renderComicBox(container, items) {
-    if (window.ComicLongBoxes) {
-      window.ComicLongBoxes.render(container, items, showItemOverlay);
+    if (!window.ComicLongBoxes) {
+      container.appendChild(text("div", "empty-on-shelf", "Comics view failed to load — try reloading the page."));
       return;
     }
-    if (!items.length) {
-      comicBoxesState.openBoxKey = null;
-      container.appendChild(text("div", "empty-on-shelf", "YOUR COMIC COLLECTION IS EMPTY"));
-      return;
-    }
-
-    var boxes = groupComicsIntoBoxes(items);
-    // The open box may have emptied out (its last issue removed/moved) or
-    // disappeared under a new search term — fall back to the shelf rather
-    // than render a box that no longer exists.
-    if (comicBoxesState.openBoxKey && !boxes.some(function (b) { return b.key === comicBoxesState.openBoxKey; })) {
-      comicBoxesState.openBoxKey = null;
-    }
-
-    if (comicBoxesState.openBoxKey) {
-      renderOpenComicBox(container, boxes);
-    } else {
-      renderComicBoxShelf(container, boxes);
-    }
-  }
-
-  function renderComicBoxShelf(container, boxes) {
-    var shelf = document.createElement("div");
-    shelf.className = "comic-box-shelf";
-    boxes.forEach(function (box) {
-      var tile = document.createElement("button");
-      tile.type = "button";
-      tile.className = "comic-box-tile";
-      tile.setAttribute("aria-label", "Open " + box.label + " (" + issueCountLabel(box.items.length) + ")");
-      tile.innerHTML =
-        '<div class="comic-box-lid"></div>' +
-        '<div class="comic-box-face">' +
-          '<div class="comic-box-label">' + escapeHtml(box.label) + "</div>" +
-          '<div class="comic-box-count">' + issueCountLabel(box.items.length) + "</div>" +
-        "</div>";
-      tile.addEventListener("click", function () {
-        comicBoxesState.openBoxKey = box.key;
-        renderGrid();
-      });
-      shelf.appendChild(tile);
-    });
-    container.appendChild(shelf);
-  }
-
-  function renderOpenComicBox(container, boxes) {
-    var box = boxes.filter(function (b) { return b.key === comicBoxesState.openBoxKey; })[0];
-    if (!box) return;
-
-    var wrap = document.createElement("div");
-    wrap.className = "comic-box-open";
-
-    var header = document.createElement("div");
-    header.className = "comic-box-open-header";
-    var backBtn = document.createElement("button");
-    backBtn.type = "button";
-    backBtn.className = "comic-box-back";
-    backBtn.textContent = "‹ All Boxes";
-    backBtn.addEventListener("click", function () {
-      comicBoxesState.openBoxKey = null;
-      renderGrid();
-    });
-    var title = document.createElement("div");
-    title.className = "comic-box-open-title";
-    title.textContent = box.label + " — " + issueCountLabel(box.items.length);
-    header.append(backBtn, title);
-    wrap.appendChild(header);
-
-    var topdown = document.createElement("div");
-    topdown.className = "comic-box-topdown";
-    var row = document.createElement("div");
-    row.className = "comic-topdown-row";
-    box.items.forEach(function (item) { row.appendChild(buildComicTopdownTile(item)); });
-    topdown.appendChild(row);
-    wrap.appendChild(topdown);
-
-    container.appendChild(wrap);
-  }
-
-  function buildComicTopdownTile(item) {
-    var tile = document.createElement("button");
-    tile.type = "button";
-    tile.className = "comic-topdown-item";
-    tile.setAttribute("aria-label", item.title || "Comic issue");
-    tile.innerHTML = '<img src="' + (item.image || "") + '" alt="" onerror="this.style.visibility=\'hidden\'">';
-    tile.addEventListener("click", function () { showItemOverlay(item); });
-    return tile;
+    window.ComicLongBoxes.render(container, items, showItemOverlay);
   }
 
   function text(tag, cls, content) {
