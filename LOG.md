@@ -1400,3 +1400,59 @@ synthetic events), click-to-open still resolving to the correct item,
 keyboard focus still pulling the right comic forward, and the touch
 two-tap flow (pull forward, then open) — all unchanged in behavior,
 just no longer gets stuck. Zero console errors throughout.
+
+## 2026-11-16
+
+**Planned:** Adrian said the site "still looks unfinished" and wants a
+heavier design pass, in three areas he picked when asked: overall
+chrome/polish, specific category shelves/cases, and mobile layout. He's
+also having ChatGPT generate SVG assets on the side that need to be able
+to "dynamically change with the site" (recolor/resize via CSS, not static
+baked art). Explored and abandoned three different "make the movies shelf
+less generic" redesigns first (VHS tape spine, CRT TV display, film-reel
+strip) — Adrian rejected all three ("Try something else" x2, then "ditch
+the idea as a whole"); fully reverted each via `git checkout`, nothing
+was ever committed, Movies stays on its original generated-color spine.
+
+**Found (mobile):** two real bugs, found by measuring real DOM rects
+rather than trusting screenshots (`getBoundingClientRect`, `scrollWidth`
+vs `clientWidth`) — a lesson from earlier sessions that screenshot pixel
+coordinates don't reliably match the real viewport.
+- The category tab strip (`#categoryTabs`) genuinely overflows
+  horizontally (`scrollWidth` 423 vs `clientWidth` 382 at 375px wide) with
+  no visual hint that there's more to scroll to.
+- The masthead subtitle (Japanese text) and the footer plank (English
+  text) both wrap mid-phrase at narrow widths — CJK text breaks between
+  any two characters by default, and the footer's flex row just squeezed
+  instead of stacking.
+
+**Fixed:**
+- Wrapped the tab strip in a `.side-menu-wrap`, added a `.side-menu-more`
+  fade+arrow hint (CSS gradient to `var(--paper)`, matching the strip's
+  own background) that disappears once scrolled to the end. Backing JS
+  (`initTabScrollHint` in `app.js`) listens for `scroll`/`resize` and uses
+  a `ResizeObserver` (with a `requestAnimationFrame` + `load` fallback) to
+  re-check once layout has actually settled — the first version wrongly
+  marked "nothing to scroll to" at `DOMContentLoaded`, when the strip can
+  still measure 0×0 before layout runs.
+- `.jp` now uses `word-break: keep-all; overflow-wrap: normal;` so
+  Japanese text only breaks at natural word boundaries.
+- `.bottom-plank` switches to a stacked, centered column under 600px
+  instead of squeezing its row.
+
+**Verified:** at an emulated 375px-wide viewport — confirmed via real
+`scrollWidth`/`clientWidth`/`scrollLeft` reads (not screenshots) that the
+fade/arrow is visible on load, and that scrolling the strip to its end
+correctly toggles it off. Confirmed the masthead subtitle and footer no
+longer break mid-word/mid-phrase. No console errors.
+
+**Also discussed (not yet built):** a list of specific SVG asset
+suggestions for ChatGPT to generate for the chrome/polish pass — covering
+the masthead's three empty "window" placeholders and the plain striped
+category backdrop — given directly in chat rather than filed here, since
+nothing's been built from them yet.
+
+**Open:** the SVG assets themselves don't exist yet — once ChatGPT
+produces them and Adrian hands them over, wiring them in (as `currentColor`-
+themed, viewBox-scaled, purely decorative SVG, never standing in for real
+collection data) is a separate follow-up.
