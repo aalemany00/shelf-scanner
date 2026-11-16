@@ -36,7 +36,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 img { max-width: 100%; }
 
-.jp { font-family: var(--jp-font); }
+/* Never break a Japanese phrase mid-word when it wraps — without this a
+   narrow viewport can split e.g. 宝物屋 into 宝/物屋, since CJK text can
+   wrap between any two characters by default. Letting it wrap only at an
+   actual space (before/after the ・ separator, where one's already used
+   throughout this file) reads as an intentional two-line layout instead
+   of a mistake. */
+.jp { font-family: var(--jp-font); word-break: keep-all; overflow-wrap: normal; }
 .hidden { display: none !important; }
 
 /* Faint print-grain overlay over the whole page, store-catalog style. */
@@ -614,6 +620,12 @@ img { max-width: 100%; }
   font-weight: 900;
   letter-spacing: 1.5px;
 }
+@media (max-width: 600px) {
+  /* Side by side, the two lines don't both fit at this width and the
+     English one wraps mid-phrase ("YOUR COLLECTION, YOUR / STORY").
+     Stacking gives each line the full width to lay out in instead. */
+  .bottom-plank { flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+}
 
 /* ============================================================
    Physical shelves — Books & Manga, Movies, Games. Pure CSS spines
@@ -978,7 +990,16 @@ img { max-width: 100%; }
   .hero-brand h1 { font-size: clamp(32px, 9vw, 54px); }
   .mast-right { display: none; }
   .sidebar { padding: 8px; border-right: 0; border-bottom: 5px solid #744c39; }
-  .side-menu { display: flex; overflow-x: auto; gap: 3px; padding: 5px; margin-bottom: 8px; }
+  .side-menu-wrap { position: relative; margin-bottom: 8px; }
+  .side-menu { display: flex; overflow-x: auto; gap: 3px; padding: 5px; margin-bottom: 0; }
+  .side-menu-more {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 26px;
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 2px; font-size: 16px; color: #744c39;
+    background: linear-gradient(to right, rgba(253, 246, 227, 0), var(--paper) 65%);
+    pointer-events: none; transition: opacity 0.15s ease;
+  }
+  .side-menu-wrap.at-end .side-menu-more { opacity: 0; }
   .side-menu button { width: auto; flex: none; font-size: 10px; padding: 4px 7px; height: 34px; gap: 5px; border-bottom: 0; border-right: 1px dashed #ad9574; }
   .side-menu button b { display: none; }
   .scan-panel, .manual-panel { display: inline-flex; width: auto; margin: 0 7px 6px 0; height: 42px; padding: 5px 9px; box-shadow: none; border-width: 2px; }

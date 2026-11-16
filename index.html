@@ -60,13 +60,21 @@
 
     <div class="site-body">
       <aside class="sidebar">
-        <nav class="side-menu" id="categoryTabs" aria-label="Collection categories">
-          <button class="cat-tab active" data-cat="game"><span class="nav-icon">🎮</span><span>Games</span><b>›</b></button>
-          <button class="cat-tab" data-cat="figure"><span class="nav-icon">♟</span><span>Figures</span><b>›</b></button>
-          <button class="cat-tab" data-cat="comic"><span class="nav-icon">▤</span><span>Comics</span><b>›</b></button>
-          <button class="cat-tab" data-cat="book"><span class="nav-icon">▥</span><span>Books &amp; Manga</span><b>›</b></button>
-          <button class="cat-tab" data-cat="movie"><span class="nav-icon">▣</span><span>Movies</span><b>›</b></button>
-        </nav>
+        <!-- On mobile .side-menu becomes a horizontally-scrolling strip
+             (see the max-width: 850px rule in style.css) — this wrapper
+             hosts a fade-plus-arrow hint at its right edge so it's obvious
+             there's more to scroll to, instead of the strip just cutting
+             off with no affordance. JS toggles .at-end on scroll. -->
+        <div class="side-menu-wrap">
+          <nav class="side-menu" id="categoryTabs" aria-label="Collection categories">
+            <button class="cat-tab active" data-cat="game"><span class="nav-icon">🎮</span><span>Games</span><b>›</b></button>
+            <button class="cat-tab" data-cat="figure"><span class="nav-icon">♟</span><span>Figures</span><b>›</b></button>
+            <button class="cat-tab" data-cat="comic"><span class="nav-icon">▤</span><span>Comics</span><b>›</b></button>
+            <button class="cat-tab" data-cat="book"><span class="nav-icon">▥</span><span>Books &amp; Manga</span><b>›</b></button>
+            <button class="cat-tab" data-cat="movie"><span class="nav-icon">▣</span><span>Movies</span><b>›</b></button>
+          </nav>
+          <span class="side-menu-more" aria-hidden="true">›</span>
+        </div>
 
         <div class="side-divider">★ ★ ★</div>
 

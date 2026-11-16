@@ -67,6 +67,32 @@
     renderTabs();
     renderGrid();
     initSync();
+    initTabScrollHint();
+  }
+
+  // Shows a fade/arrow hint on the mobile category-tab strip when there's
+  // more to scroll to, and hides it once the strip is scrolled to the end.
+  function initTabScrollHint() {
+    var tabs = el.tabs;
+    if (!tabs) return;
+    var wrap = tabs.closest(".side-menu-wrap");
+    if (!wrap) return;
+
+    function update() {
+      var atEnd = tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 2;
+      wrap.classList.toggle("at-end", atEnd || tabs.scrollWidth <= tabs.clientWidth);
+    }
+
+    tabs.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    // Run after layout settles — at DOMContentLoaded the strip can still
+    // measure 0-width, which would wrongly read as "nothing to scroll to".
+    if (window.ResizeObserver) {
+      new ResizeObserver(update).observe(tabs);
+    } else {
+      window.addEventListener("load", update);
+    }
+    requestAnimationFrame(update);
   }
 
   // ---------- sync (Firebase, see sync.js) ----------
