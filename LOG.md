@@ -1560,3 +1560,15 @@ clear ~92px gap between the cat and the sign (no overlap). Also checked
 a narrower desktop width (900px, near the 850px tablet breakpoint) to
 make sure moving it left didn't push it into the masthead title text —
 no overlap there either.
+
+## 2026-11-16 (7)
+
+**Decided:** Adrian didn't like the Japanese-shop shelves/counter backdrop
+behind the cat ("i dont like it, remove it") — no specific reason given.
+Reverted the whole thing with `git revert -m 1` on the PR #17 merge
+commit, cleanly restoring the standalone cat from before (same position,
+no shelves/counter). Deleted the now-unused `assets/shopkeeper-shelves.svg`
+and `assets/shopkeeper-counter.svg`; kept `assets/shopkeeper-cat.svg`.
+
+**Verified:** reloaded at 1400px wide — cat renders alone on the plain
+masthead backdrop again, matching how it looked right after PR #16.
