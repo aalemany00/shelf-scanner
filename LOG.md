@@ -1618,3 +1618,21 @@ and `assets/shopkeeper-counter.svg`; kept `assets/shopkeeper-cat.svg`.
 
 **Verified:** reloaded at 1400px wide — cat renders alone on the plain
 masthead backdrop again, matching how it looked right after PR #16.
+
+## 2026-11-16 (8)
+
+**Asked:** "add everything we did to the logs and dev logs."
+
+**Found:** this file was actually missing one round — `git revert -m 1`
+on the PR #17 merge had reverted that PR's LOG.md entry along with its
+code, so the record of the shelves/counter backdrop (what was built, the
+positioning bugs found and fixed) was gone even though it's worth
+keeping as history of a tried-and-abandoned direction.
+
+**Fixed:** restored that entry as (6) above, between the existing (5)
+and the revert entry (7), via a separate PR (#19) so the fix itself is
+on record too. Added a new top entry to the portfolio's site-wide dev
+log (`project-world-main/devlog.js`) summarizing this whole Shelf
+Scanner round — mobile fixes, the poster/mascot art swaps, and the
+backdrop built then pulled — pushed directly to that repo's `main`,
+matching how it's normally committed there.
