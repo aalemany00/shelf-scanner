@@ -225,11 +225,14 @@ img { max-width: 100%; }
   box-shadow: 0 0 14px #e88c54a3;
   border: 2px solid #8e2f31;
 }
-.mascot {
+.shopkeeper-cat {
   position: absolute;
-  width: 90px; height: auto;
-  right: 180px; bottom: -36px;
-  filter: drop-shadow(3px 3px 1px #241b25);
+  right: 20%;
+  bottom: -8px;
+  height: 155px;
+  width: auto;
+  object-fit: contain;
+  z-index: 5;
 }
 
 /* ============================================================
@@ -981,6 +984,7 @@ img { max-width: 100%; }
   .hero-brand { width: 90%; margin-left: 12px; }
   .hero-brand h1 { font-size: clamp(32px, 9vw, 54px); }
   .mast-right { display: none; }
+  .shopkeeper-cat { display: none; }
   .sidebar { padding: 8px; border-right: 0; border-bottom: 5px solid #744c39; }
   .side-menu-wrap { position: relative; margin-bottom: 8px; }
   .side-menu { display: flex; overflow-x: auto; gap: 3px; padding: 5px; margin-bottom: 0; }
