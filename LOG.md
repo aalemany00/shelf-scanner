@@ -1560,3 +1560,45 @@ clear ~92px gap between the cat and the sign (no overlap). Also checked
 a narrower desktop width (900px, near the 850px tablet breakpoint) to
 make sure moving it left didn't push it into the masthead title text —
 no overlap there either.
+
+## 2026-11-16 (6)
+
+**Asked:** Adrian wanted a Japanese-shop-style background behind the
+shopkeeper cat (which until now just floated on the plain masthead
+backdrop), with creative freedom on exactly how to compose it. He
+provided two more SVGs: `shelf_scanner_shopkeeper_shelves.svg` (a back
+wall of bookshelves — comics, books, a vintage radio, a little plant, a
+framed print) and `shelf_scanner_shopkeeper_counter.svg` (a wooden front
+counter with a brass service bell), both sharing the same `viewBox="0 0
+780 245"` as each other.
+
+**Built:** saved both as `assets/shopkeeper-shelves.svg` and
+`assets/shopkeeper-counter.svg`. Wrapped the cat in a new
+`.shopkeeper-scene` container (shelves behind, cat in the middle, counter
+in front, via z-index) inside the masthead. Because the shelves and
+counter art share one coordinate system, stacking both at the same
+size/position inside the scene made them line up correctly on their
+own — no manual pixel alignment needed. The cat is centered on top and
+sized so it reads as standing at the counter, partly behind it.
+
+**Found and fixed a sizing problem mid-build:** a first pass (fixed
+380px-wide scene, `right: 32%`) looked right at ~1400–1920px but, when
+checked at narrower desktop widths, started overlapping `.mast-right`
+(a fixed 300px box) — because `right: %` drifts relative to the
+*masthead's* width while `.mast-right` itself doesn't shrink. Switched
+to a fixed `right: 360px` (anchored to `.mast-right`'s own width + its
+40px margin, so it can't drift into it regardless of viewport width) and
+a `clamp(220px, 27vw, 380px)` scene width with `aspect-ratio: 780/245`
+instead of a baked pixel height, so it scales down gracefully. Measured
+the real available gap between the hero-brand text and the sign at
+several widths (119px at 851px, 168px at 900px, up to 579px at 1400px) —
+below ~1100px there isn't enough room for the scene to read as anything
+but cramped, so added a dedicated `@media (max-width: 1100px)` rule to
+hide just `.shopkeeper-scene` (separate from the existing 850px rule that
+hides `.mast-right` and the sign entirely) rather than squeezing it into
+a space too small for it.
+
+**Verified:** via `getBoundingClientRect()` at 1101px, 1400px, and
+1920px — clear gaps on both sides (brand text and sign), no overlap.
+Confirmed `display: none` at both the new 1100px scene-only breakpoint
+and the existing 375px mobile breakpoint. No console errors.
