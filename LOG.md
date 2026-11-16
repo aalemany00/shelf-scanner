@@ -1456,3 +1456,37 @@ nothing's been built from them yet.
 produces them and Adrian hands them over, wiring them in (as `currentColor`-
 themed, viewBox-scaled, purely decorative SVG, never standing in for real
 collection data) is a separate follow-up.
+
+## 2026-11-16 (2)
+
+**Asked:** Adrian had ChatGPT generate a full travel-poster illustration
+(sun, Mt. Fuji, a lantern-lit street, cherry blossoms, the same "Your Tiny
+Collection Paradise!" title) and asked to swap it in for the sidebar's
+`.city-poster` box, which until now was pure CSS (a gradient sky, a
+CSS-clipped mountain shape, and the title as real text).
+
+**Decided:** this is a one-off, explicit exception to the "no baked AI art"
+rule the redesign settled on back on 2026-11-12 — that rule was about
+*shelf/chrome art standing in for collection data or needing to hold a
+variable-size collection* (spines, cases, long-boxes), which a fixed
+illustration genuinely can't do. This poster has never held any real data;
+it's a static decorative flourish, so a baked image here doesn't hit the
+same failure mode. Confirmed scope with Adrian first (replace the whole
+box vs. just the mountain shape) since the image already bakes in the
+same title text the CSS version showed separately — he said replace the
+whole box.
+
+**Built:** saved the image to `assets/city-poster.webp`. Replaced the
+`.city-poster` div's CSS-drawn sun/mountain/text/silhouette with a single
+`<img>`, kept the same frame (border + box-shadow). `.city-poster` now
+sizes itself with `aspect-ratio` instead of a fixed height, and the image
+uses `object-fit: cover` so it scales with the sidebar's actual width
+instead of being pinned to one pixel size — this is the "dynamically
+changes when the window pane changes" behavior Adrian asked for, just via
+responsive image sizing rather than a vector asset (a raster poster can't
+recolor via CSS the way an SVG could, but it can still resize cleanly).
+
+**Verified:** loaded at 1280px wide — image renders, fills the box,
+`naturalWidth`/`naturalHeight` confirm it decoded fine, `object-fit:
+cover` confirmed via computed style. Did not re-check the <600px mobile
+view since `.city-poster` is already `display: none` there (unchanged).
