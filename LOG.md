@@ -1508,3 +1508,40 @@ different ratio).
 **Verified:** at 1280px wide, confirmed via `getBoundingClientRect()` that
 the poster box and the image inside it are both exactly 203×203 — full
 image visible, no cropping.
+
+## 2026-11-16 (4)
+
+**Asked:** Adrian sent a new shopkeeper-cat illustration (an actual SVG
+file this time, not raster — `shelf_scanner_cat_shopkeeper.svg`, with
+separate `<g>` groups per body part so it can be animated later) plus a
+`.shopkeeper-cat` CSS rule to position it, to replace the hand-drawn
+`<svg class="mascot">` in the masthead.
+
+**Built:** saved the file as `assets/shopkeeper-cat.svg`, referenced via
+`<img class="shopkeeper-cat" src="assets/shopkeeper-cat.svg" alt=""
+aria-hidden="true">` (an `<img>` rather than inlining ~100 lines of path
+data into `index.html` — this SVG hardcodes its own colors rather than
+using `currentColor`, so there's no CSS-theming reason to inline it).
+Removed the old `.mascot` SVG markup and CSS rule. Added Adrian's
+`.shopkeeper-cat` CSS as given.
+
+**Found and fixed two problems the pasted CSS didn't anticipate:**
+- The rule's `right: 20%` only makes sense against a wide container;
+  the original mascot lived inside `.mast-right` (a 300px-wide flex box
+  holding the hanging sign), where 20% put the new, much bigger cat
+  (155px tall vs. the old 90px-wide mascot) directly on top of "THE
+  COLLECTION ROOM" text. Moved the `<img>` out of `.mast-right` to be a
+  direct child of `<header class="masthead">` instead, so `right: 20%`
+  resolves against the full masthead width like the percentage implies,
+  clearing the sign entirely.
+- `.mast-right { display: none; }` on mobile/tablet (<850px) no longer
+  covered the cat once it moved outside that div — without a fix it
+  rendered at full 155px height inside a masthead that shrinks to
+  150/128px on narrow screens, blowing out the layout. Added
+  `.shopkeeper-cat { display: none; }` alongside the existing
+  `.mast-right` rule in that same breakpoint.
+
+**Verified:** at 1280px wide, confirmed via `getBoundingClientRect()` the
+cat sits fully inside the masthead with no clipping and doesn't overlap
+the sign. Confirmed `display: none` takes effect at both the 850px and
+375px breakpoints. No console errors.
