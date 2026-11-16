@@ -227,9 +227,9 @@ img { max-width: 100%; }
 }
 .shopkeeper-cat {
   position: absolute;
-  right: 20%;
+  right: 28%;
   bottom: -8px;
-  height: 155px;
+  height: 130px;
   width: auto;
   object-fit: contain;
   z-index: 5;

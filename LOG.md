@@ -1545,3 +1545,18 @@ Removed the old `.mascot` SVG markup and CSS rule. Added Adrian's
 cat sits fully inside the masthead with no clipping and doesn't overlap
 the sign. Confirmed `display: none` takes effect at both the 850px and
 375px breakpoints. No console errors.
+
+## 2026-11-16 (5)
+
+**Asked:** move the shopkeeper cat further left and shrink it a bit —
+at wider viewports it was still close enough to "THE COLLECTION ROOM"
+sign to look cramped.
+
+**Fixed:** `.shopkeeper-cat` from `right: 20%; height: 155px` to
+`right: 28%; height: 130px`.
+
+**Verified:** at 1555px wide, confirmed via `getBoundingClientRect()` a
+clear ~92px gap between the cat and the sign (no overlap). Also checked
+a narrower desktop width (900px, near the 850px tablet breakpoint) to
+make sure moving it left didn't push it into the masthead title text —
+no overlap there either.
