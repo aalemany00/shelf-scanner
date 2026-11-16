@@ -1490,3 +1490,21 @@ recolor via CSS the way an SVG could, but it can still resize cleanly).
 `naturalWidth`/`naturalHeight` confirm it decoded fine, `object-fit:
 cover` confirmed via computed style. Did not re-check the <600px mobile
 view since `.city-poster` is already `display: none` there (unchanged).
+
+## 2026-11-16 (3)
+
+**Found:** Adrian flagged the new city poster looked "cropped weird." Root
+cause: `.city-poster` was sized at `aspect-ratio: 5/4` (carried over from
+the old fixed-height box), but the actual illustration is a square
+(1254×1254). `object-fit: cover` on a wider-than-tall box was cropping
+the top and bottom off a square image to fill that shape.
+
+**Fixed:** `.city-poster`'s `aspect-ratio` to `1/1` to match the image,
+and switched the `<img>` to `object-fit: contain` (belt-and-suspenders —
+exact ratio match means `cover`/`contain` render identically, but
+`contain` won't crop if a future swapped-in image has a slightly
+different ratio).
+
+**Verified:** at 1280px wide, confirmed via `getBoundingClientRect()` that
+the poster box and the image inside it are both exactly 203×203 — full
+image visible, no cropping.
